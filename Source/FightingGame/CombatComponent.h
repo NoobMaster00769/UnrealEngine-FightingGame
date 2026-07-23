@@ -5,6 +5,7 @@
 #include "WeaponBase.h"
 #include "CombatComponent.generated.h"
 
+class UDefenseComponent;
 
 UENUM(BlueprintType)
 enum class EAttackType : uint8
@@ -110,7 +111,13 @@ public:
 	UPROPERTY(BlueprintAssignable)
 	FOnSuccessfulHit OnSuccessfulHit;
 
+	UFUNCTION(BlueprintCallable)
+	void SetCanAttack(bool bNewCanAttack);
+
 private:
+
+	UPROPERTY()
+	UDefenseComponent* Defense = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Combat|Damage")
 	float LightAttackDamage = 20.f;

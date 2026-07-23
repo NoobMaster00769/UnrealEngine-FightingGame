@@ -1,5 +1,6 @@
 #include "CombatComponent.h"
 #include "HealthComponent.h"
+#include "DefenseComponent.h"
 
 UCombatComponent::UCombatComponent()
 {
@@ -9,6 +10,7 @@ UCombatComponent::UCombatComponent()
 void UCombatComponent::BeginPlay()
 {
     Super::BeginPlay();
+    Defense = GetOwner()->FindComponentByClass<UDefenseComponent>();
 }
 
 void UCombatComponent::TickComponent(
@@ -30,6 +32,11 @@ void UCombatComponent::StartLightAttack()
 {
     if (!bCanAttack)
         return;
+
+    if (Defense && Defense->IsDodging())
+    {
+        return;
+    }
 
     bIsAttacking = true;
     bCanAttack = false;
@@ -53,6 +60,10 @@ void UCombatComponent::StartHeavyAttack()
     if (!bCanAttack)
         return;
 
+    if (Defense && Defense->IsDodging())
+    {
+        return;
+    }
     bIsAttacking = true;
     bCanAttack = false;
 
@@ -221,4 +232,9 @@ float UCombatComponent::GetCurrentDamage() const
 EAttackType UCombatComponent::GetAttackType() const
 {
     return CurrentAttackType;
+}
+
+void UCombatComponent::SetCanAttack(bool bNewCanAttack)
+{
+    bCanAttack = bNewCanAttack;
 }
