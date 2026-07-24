@@ -1,6 +1,8 @@
 #include "CombatComponent.h"
 #include "HealthComponent.h"
 #include "DefenseComponent.h"
+#include "HitReactionComponent.h"
+
 
 UCombatComponent::UCombatComponent()
 {
@@ -178,8 +180,46 @@ void UCombatComponent::RegisterHit(AActor* HitActor)
 
     if (UHealthComponent* Health =
         HitActor->FindComponentByClass<UHealthComponent>())
-    {
-        Health->TakeDamage(CurrentAttackDamage);
+    {   
+        const FVector VictimForward =
+            HitActor->GetActorForwardVector();
+
+        const FVector ToAttacker =
+            (GetOwner()->GetActorLocation() -
+                HitActor->GetActorLocation()).GetSafeNormal();
+
+        const float ForwardDot =
+            FVector::DotProduct(
+                VictimForward,
+                ToAttacker);
+
+        const float RightDot =
+            FVector::DotProduct(
+                HitActor->GetActorRightVector(),
+                ToAttacker);
+
+        EHitDirection Direction;
+
+        if (ForwardDot > 0.7f)
+        {
+            Direction = EHitDirection::Front;
+        }
+        else if (ForwardDot < -0.7f)
+        {
+            Direction = EHitDirection::Back;
+        }
+        else if (RightDot > 0.f)
+        {
+            Direction = EHitDirection::Right;
+        }
+        else
+        {
+            Direction = EHitDirection::Left;
+        }
+
+        Health->TakeDamage(
+            CurrentAttackDamage,
+            Direction);
 
         if (bDebugCombat)
         {

@@ -4,8 +4,13 @@
 #include "Components/ActorComponent.h"
 #include "HealthComponent.generated.h"
 
+class UHitReactionComponent;
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDeath);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnHealthChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
+    FOnHealthChanged,
+    float,
+    CurrentHealth);
 
 UCLASS(ClassGroup = (Combat), BlueprintType, Blueprintable, meta = (BlueprintSpawnableComponent))
 class FIGHTINGGAME_API UHealthComponent : public UActorComponent
@@ -30,7 +35,9 @@ public:
     void InitializeHealth(float StartingHealth);
 
     UFUNCTION(BlueprintCallable)
-    void TakeDamage(float Damage);
+    void TakeDamage(
+        float Damage,
+        EHitDirection Direction);
 
     UFUNCTION(BlueprintCallable)
     void Heal(float Amount);
@@ -69,4 +76,7 @@ private:
 
     UPROPERTY(EditAnywhere, Category = "Debug")
     bool bDebugHealth = true;
+
+    UPROPERTY()
+    UHitReactionComponent* HitReaction = nullptr;
 };

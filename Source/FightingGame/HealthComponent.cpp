@@ -2,6 +2,8 @@
 
 #include "Engine/Engine.h"
 
+#include "HitReactionComponent.h"
+
 UHealthComponent::UHealthComponent()
 {
     PrimaryComponentTick.bCanEverTick = false;
@@ -10,6 +12,8 @@ UHealthComponent::UHealthComponent()
 void UHealthComponent::BeginPlay()
 {
     Super::BeginPlay();
+
+    HitReaction = GetOwner()->FindComponentByClass<UHitReactionComponent>();
 }
 
 void UHealthComponent::InitializeHealth(float StartingHealth)
@@ -29,7 +33,9 @@ void UHealthComponent::InitializeHealth(float StartingHealth)
             FString::Printf(TEXT("Initialized Health: %.0f"), CurrentHealth));
     }
 }
-void UHealthComponent::TakeDamage(float Damage)
+void UHealthComponent::TakeDamage(
+    float Damage,
+    EHitDirection Direction)
 {
     if (!bCanTakeDamage || bIsDead)
         return;
@@ -38,6 +44,11 @@ void UHealthComponent::TakeDamage(float Damage)
         CurrentHealth - Damage,
         0.f,
         MaxHealth);
+
+    if (CurrentHealth > 0.f && HitReaction)
+    {
+        HitReaction->ReactToHit(Direction);
+    }
 
     if (bDebugHealth && GEngine)
     {
@@ -51,7 +62,7 @@ void UHealthComponent::TakeDamage(float Damage)
                 MaxHealth));
     }
 
-    OnHealthChanged.Broadcast();
+    OnHealthChanged.Broadcast(CurrentHealth);
 
     if (CurrentHealth <= 0.f)
     {
@@ -79,7 +90,7 @@ void UHealthComponent::Heal(float Amount)
         0.f,
         MaxHealth);
 
-    OnHealthChanged.Broadcast();
+    OnHealthChanged.Broadcast(CurrentHealth);
 
     if (bDebugHealth && GEngine)
     {
