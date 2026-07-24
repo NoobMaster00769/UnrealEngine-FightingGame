@@ -129,3 +129,8 @@ bool UHealthComponent::IsAlive() const
 {
     return !bIsDead;
 }
+
+bool UHealthComponent::IsDead() const
+{
+    return bIsDead;
+}

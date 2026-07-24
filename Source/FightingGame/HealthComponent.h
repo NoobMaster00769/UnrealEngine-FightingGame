@@ -77,6 +77,9 @@ private:
     UPROPERTY(EditAnywhere, Category = "Debug")
     bool bDebugHealth = true;
 
+    UFUNCTION(BlueprintPure)
+    bool IsDead() const;
+
     UPROPERTY()
     UHitReactionComponent* HitReaction = nullptr;
 };
