@@ -5,6 +5,10 @@
 #include "TimerManager.h"
 #include "EnemyRoleDataAsset.h"
 #include "EnemyBrainComponent.generated.h"
+class UCombatComponent;
+class UDefenseComponent;
+class UHealthComponent;
+class UEnemyMovementComponent;
 
 class AActor;
 
@@ -94,6 +98,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Brain")
     float ThinkInterval = 0.25f;
 
+    UPROPERTY(EditAnywhere, Category = "Debug")
+    bool bDebugBrain = true;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Brain")
     TObjectPtr<UEnemyRoleDataAsset> RoleAsset;
 
@@ -129,6 +136,16 @@ protected:
     void ExecuteDecision();
 
 private:
+    UPROPERTY()
+    UCombatComponent* Combat;
 
+    UPROPERTY()
+    UDefenseComponent* Defense;
+
+    UPROPERTY()
+    UHealthComponent* Health;
+
+    UPROPERTY()
+    UEnemyMovementComponent* Movement;
     FTimerHandle ThinkTimer;
 };

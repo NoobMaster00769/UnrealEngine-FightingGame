@@ -50,6 +50,12 @@ public:
         return bInvulnerable;
     }
 
+    UFUNCTION(BlueprintPure)
+    bool CanDodge() const
+    {
+        return bCanDodge;
+    }
+
 public:
 
     UPROPERTY(BlueprintAssignable)

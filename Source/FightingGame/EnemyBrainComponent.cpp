@@ -1,6 +1,10 @@
 #include "EnemyBrainComponent.h"
 #include "EnemyRoleDataAsset.h"
 #include "Engine/World.h"
+#include "CombatComponent.h"
+#include "DefenseComponent.h"
+#include "HealthComponent.h"
+#include "EnemyMovementComponent.h"
 #include "GameFramework/Actor.h"
 
 UEnemyBrainComponent::UEnemyBrainComponent()
@@ -11,6 +15,18 @@ UEnemyBrainComponent::UEnemyBrainComponent()
 void UEnemyBrainComponent::BeginPlay()
 {
 	Super::BeginPlay();
+
+	Combat =
+		GetOwner()->FindComponentByClass<UCombatComponent>();
+
+	Defense =
+		GetOwner()->FindComponentByClass<UDefenseComponent>();
+
+	Health =
+		GetOwner()->FindComponentByClass<UHealthComponent>();
+
+	Movement =
+		GetOwner()->FindComponentByClass<UEnemyMovementComponent>();
 }
 
 void UEnemyBrainComponent::InitializeBrain()
@@ -63,7 +79,7 @@ void UEnemyBrainComponent::SetTarget(AActor* NewTarget)
 
 void UEnemyBrainComponent::UpdateContext()
 {
-	if (Context.TargetActor == nullptr)
+	if (!Context.TargetActor)
 	{
 		return;
 	}
@@ -71,8 +87,42 @@ void UEnemyBrainComponent::UpdateContext()
 	Context.DistanceToTarget =
 		FVector::Distance(
 			GetOwner()->GetActorLocation(),
-			Context.TargetActor->GetActorLocation()
-		);
+			Context.TargetActor->GetActorLocation());
+
+	if (Health)
+	{
+		Context.EnemyHealthPercent =
+			Health->GetHealthPercent();
+	}
+
+	if (Combat)
+	{
+		Context.bCanAttack =
+			Combat->CanAttack();
+	}
+
+	if (Defense)
+	{
+		Context.bCanDodge =
+			Defense->CanDodge();
+	}
+
+	if (UHealthComponent* TargetHealth =
+		Context.TargetActor->FindComponentByClass<UHealthComponent>())
+	{
+		Context.TargetHealthPercent =
+			TargetHealth->GetHealthPercent();
+	}
+
+	if (bDebugBrain)
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("[Brain] Dist %.0f  HP %.2f"),
+			Context.DistanceToTarget,
+			Context.EnemyHealthPercent);
+	}
 }
 
 const FRoleProfile& UEnemyBrainComponent::GetProfile() const
@@ -140,9 +190,17 @@ float UEnemyBrainComponent::ScoreApproach() const
 	if (Context.DistanceToTarget <= P.PreferredCombatDistance)
 		return 0.f;
 
-	return
+	float Score =
 		(Context.DistanceToTarget - P.PreferredCombatDistance)
 		* P.ApproachWeight;
+
+	Score *=
+		FMath::Lerp(
+			0.5f,
+			1.3f,
+			Context.EnemyHealthPercent);
+
+	return Score;
 }
 
 float UEnemyBrainComponent::ScoreRetreat() const
@@ -155,9 +213,17 @@ float UEnemyBrainComponent::ScoreRetreat() const
 	if (Context.DistanceToTarget >= P.RetreatDistance)
 		return 0.f;
 
-	return
+	float Score =
 		(P.RetreatDistance - Context.DistanceToTarget)
 		* P.RetreatWeight;
+
+	Score *=
+		FMath::Lerp(
+			2.0f,
+			0.4f,
+			Context.EnemyHealthPercent);
+
+	return Score;
 }
 
 float UEnemyBrainComponent::ScoreStrafe() const
@@ -173,9 +239,16 @@ float UEnemyBrainComponent::ScoreStrafe() const
 	if (Context.DistanceToTarget > P.StrafeMaxDistance)
 		return 0.f;
 
-	return
-		100.f *
-		P.StrafeWeight;
+	float Score =
+		100.f * P.StrafeWeight;
+
+	Score *=
+		FMath::Lerp(
+			0.7f,
+			1.2f,
+			Context.EnemyHealthPercent);
+
+	return Score;
 }
 
 float UEnemyBrainComponent::ScoreLightAttack() const
@@ -241,5 +314,51 @@ float UEnemyBrainComponent::ScoreWait() const
 
 void UEnemyBrainComponent::ExecuteDecision()
 {
+	if (bDebugBrain)
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("[Brain] Decision = %s"),
+			*UEnum::GetValueAsString(CurrentDecision.Action));
+	}
+
+	if (!Movement)
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("[Brain] EnemyMovementComponent Missing"));
+		return;
+	}
+
+	switch (CurrentDecision.Action)
+	{
+	case ECombatAction::Approach:
+
+		Movement->ApproachTarget(Context.TargetActor);
+		break;
+
+	case ECombatAction::Retreat:
+
+		Movement->RetreatFromTarget(Context.TargetActor);
+		break;
+
+	case ECombatAction::Strafe:
+
+		Movement->StrafeAroundTarget(Context.TargetActor);
+		break;
+
+	case ECombatAction::Wait:
+
+		Movement->StopMovement();
+		break;
+
+	default:
+
+		Movement->StopMovement();
+		break;
+	}
+
 	OnDecisionMade.Broadcast(CurrentDecision.Action);
 }
