@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Animation/AnimMontage.h"
 #include "TimerManager.h"
 #include "EnemyRoleDataAsset.h"
 #include "EnemyBrainComponent.generated.h"
@@ -116,6 +117,12 @@ public:
     UPROPERTY(BlueprintAssignable)
     FOnDecisionMade OnDecisionMade;
 
+    UFUNCTION()
+    void ExecuteLightAttack();
+
+    UFUNCTION()
+    void ExecuteHeavyAttack();
+
     UFUNCTION(BlueprintCallable)
     void SetTarget(AActor* NewTarget);
 
@@ -148,4 +155,15 @@ private:
     UPROPERTY()
     UEnemyMovementComponent* Movement;
     FTimerHandle ThinkTimer;
+
+    UPROPERTY(EditAnywhere, Category = "Combat")
+    UAnimMontage* LightAttackMontage = nullptr;
+
+    UPROPERTY(EditAnywhere, Category = "Combat")
+    UAnimMontage* HeavyAttackMontage = nullptr;
+
+    UPROPERTY(EditAnywhere, Category = "Combat")
+    float AttackCooldown = 1.0f;
+
+    float LastAttackTime = -100.f;
 };

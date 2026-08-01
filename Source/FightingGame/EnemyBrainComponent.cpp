@@ -256,7 +256,16 @@ float UEnemyBrainComponent::ScoreLightAttack() const
 	if (!RoleAsset)
 		return 0.f;
 
-	if (!Context.bCanAttack)
+	if (!Combat)
+		return 0.f;
+
+	if (!Combat->CanAttack())
+		return 0.f;
+
+	if (Combat->IsAttacking())
+		return 0.f;
+
+	if (GetWorld()->TimeSeconds < LastAttackTime + AttackCooldown)
 		return 0.f;
 
 	const FRoleProfile& P = GetProfile();
@@ -264,9 +273,17 @@ float UEnemyBrainComponent::ScoreLightAttack() const
 	if (Context.DistanceToTarget > P.LightAttackRange)
 		return 0.f;
 
-	return
-		150.f *
+	float Score =
+		200.f *
 		P.LightAttackWeight;
+
+	Score *=
+		FMath::Lerp(
+			0.6f,
+			1.3f,
+			Context.EnemyHealthPercent);
+
+	return Score;
 }
 
 float UEnemyBrainComponent::ScoreHeavyAttack() const
@@ -274,7 +291,16 @@ float UEnemyBrainComponent::ScoreHeavyAttack() const
 	if (!RoleAsset)
 		return 0.f;
 
-	if (!Context.bCanAttack)
+	if (!Combat)
+		return 0.f;
+
+	if (!Combat->CanAttack())
+		return 0.f;
+
+	if (Combat->IsAttacking())
+		return 0.f;
+
+	if (GetWorld()->TimeSeconds < LastAttackTime + AttackCooldown)
 		return 0.f;
 
 	const FRoleProfile& P = GetProfile();
@@ -282,9 +308,16 @@ float UEnemyBrainComponent::ScoreHeavyAttack() const
 	if (Context.DistanceToTarget > P.HeavyAttackRange)
 		return 0.f;
 
-	return
-		120.f *
+	float Score =
+		150.f *
 		P.HeavyAttackWeight;
+
+	if (Context.TargetHealthPercent < 0.35f)
+	{
+		Score *= 1.5f;
+	}
+
+	return Score;
 }
 
 float UEnemyBrainComponent::ScoreDodge() const
@@ -311,6 +344,7 @@ float UEnemyBrainComponent::ScoreWait() const
 		10.f *
 		GetProfile().WaitWeight;
 }
+
 
 void UEnemyBrainComponent::ExecuteDecision()
 {
@@ -349,6 +383,24 @@ void UEnemyBrainComponent::ExecuteDecision()
 		Movement->StrafeAroundTarget(Context.TargetActor);
 		break;
 
+	case ECombatAction::LightAttack:
+
+		if (Combat)
+		{
+			Combat->StartLightAttack();
+			LastAttackTime = GetWorld()->TimeSeconds;
+		}
+		break;
+
+	case ECombatAction::HeavyAttack:
+
+		if (Combat)
+		{
+			Combat->StartHeavyAttack();
+			LastAttackTime = GetWorld()->TimeSeconds;
+		}
+		break;
+
 	case ECombatAction::Wait:
 
 		Movement->StopMovement();
@@ -359,6 +411,5 @@ void UEnemyBrainComponent::ExecuteDecision()
 		Movement->StopMovement();
 		break;
 	}
-
 	OnDecisionMade.Broadcast(CurrentDecision.Action);
 }
