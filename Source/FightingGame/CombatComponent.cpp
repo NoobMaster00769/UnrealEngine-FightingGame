@@ -137,6 +137,8 @@ AWeaponBase* UCombatComponent::GetCurrentWeapon() const
 
 void UCombatComponent::EnableWeaponCollision()
 {
+    bWeaponCollisionActive = true;
+
     if (!CurrentWeapon)
         return;
 
@@ -151,6 +153,8 @@ void UCombatComponent::EnableWeaponCollision()
 
 void UCombatComponent::DisableWeaponCollision()
 {
+    bWeaponCollisionActive = false;
+
     if (!CurrentWeapon)
         return;
 

@@ -44,6 +44,9 @@ public:
 						ATTACK
 	=====================================================*/
 
+	UFUNCTION(BlueprintPure)
+	bool IsWeaponCollisionActive() const { return bWeaponCollisionActive; }
+
 	UFUNCTION(BlueprintCallable)
 	void StartLightAttack();
 
@@ -118,6 +121,9 @@ private:
 
 	UPROPERTY()
 	UDefenseComponent* Defense = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Category = "Combat")
+	bool bWeaponCollisionActive = false;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Combat|Damage")
 	float LightAttackDamage = 20.f;

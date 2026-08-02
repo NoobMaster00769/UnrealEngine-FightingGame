@@ -48,6 +48,9 @@ public:
     UFUNCTION(BlueprintCallable)
     void StopMovement();
 
+    UFUNCTION(BlueprintCallable)
+    void SetTarget(AActor* Target);
+
 private:
 
     UPROPERTY()

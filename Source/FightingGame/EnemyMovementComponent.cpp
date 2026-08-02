@@ -1,6 +1,7 @@
 #include "EnemyMovementComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "NavigationSystem.h"
+#include "DefenseComponent.h"
 #include "NavigationPath.h"
 #include "Runtime/AIModule/Classes/AIController.h"
 #include "GameFramework/Character.h"
@@ -20,6 +21,8 @@ void UEnemyMovementComponent::BeginPlay()
 }
 
 void UEnemyMovementComponent::TickComponent(
+
+
     float DeltaTime,
     ELevelTick TickType,
     FActorComponentTickFunction* ThisTickFunction)
@@ -29,8 +32,23 @@ void UEnemyMovementComponent::TickComponent(
         TickType,
         ThisTickFunction);
 
-    if (!OwnerCharacter || !CurrentTarget)
+    if (!OwnerCharacter)
+    {
         return;
+    }
+
+    UDefenseComponent* Defense =
+        OwnerCharacter->FindComponentByClass<UDefenseComponent>();
+
+    if (Defense && Defense->IsDodging())
+    {
+        return;
+    }
+
+    if (!CurrentTarget)
+    {
+        return;
+    }
 
     //---------------------------------
     // Face player
@@ -131,6 +149,10 @@ void UEnemyMovementComponent::StrafeAroundTarget(AActor* Target)
 void UEnemyMovementComponent::StopMovement()
 {
     CurrentMovementMode = EEnemyMovementMode::None;
-    CurrentTarget = nullptr;
+}
+
+void UEnemyMovementComponent::SetTarget(AActor* Target)
+{
+    CurrentTarget = Target;
 }
 

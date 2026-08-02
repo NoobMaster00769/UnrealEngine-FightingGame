@@ -6,6 +6,7 @@
 #include "HealthComponent.h"
 #include "HitReactionComponent.h"
 #include "EnemyMovementComponent.h"
+#include "CombatPerceptionComponent.h"
 #include "GameFramework/Actor.h"
 
 UEnemyBrainComponent::UEnemyBrainComponent()
@@ -31,6 +32,9 @@ void UEnemyBrainComponent::BeginPlay()
 
 	HitReaction =
 		GetOwner()->FindComponentByClass<UHitReactionComponent>();
+
+	Perception =
+		GetOwner()->FindComponentByClass<UCombatPerceptionComponent>();
 }
 
 void UEnemyBrainComponent::InitializeBrain()
@@ -91,6 +95,29 @@ void UEnemyBrainComponent::Think()
 
 	UpdateContext();
 
+	if (Perception)
+	{
+		const FCombatPerceptionSnapshot& S = Perception->GetSnapshot();
+
+		UE_LOG(LogTemp, Warning,
+			TEXT("[Brain->Perception] Recovering=%d CollisionActive=%d TargetFacingMe=%d"),
+			S.bIsRecovering, S.bWeaponCollisionActive, S.bTargetIsFacingMe);
+
+		CurrentThreat = ThreatAnalyzer.Evaluate(
+			S,
+			Context.DistanceToTarget,
+			ThreatDangerRange);
+
+		if (bDebugBrain)
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("[Threat] Dangerous=%d PunishOpportunity=%d Level=%.1f"),
+				CurrentThreat.bIsDangerous,
+				CurrentThreat.bIsPunishOpportunity,
+				CurrentThreat.ThreatLevel);
+		}
+	}
+
 	EvaluateActions();
 
 	ExecuteDecision();
@@ -99,6 +126,16 @@ void UEnemyBrainComponent::Think()
 void UEnemyBrainComponent::SetTarget(AActor* NewTarget)
 {
 	Context.TargetActor = NewTarget;
+
+	if (Perception)
+	{
+		Perception->SetTarget(NewTarget);
+	}
+
+	if (Movement)
+	{
+		Movement->SetTarget(NewTarget);
+	}
 }
 
 void UEnemyBrainComponent::UpdateContext()
@@ -288,9 +325,14 @@ float UEnemyBrainComponent::ScoreLightAttack() const
 	if (Context.DistanceToTarget > P.LightAttackRange)
 		return 0.f;
 
-	return
-		150.f *
-		P.LightAttackWeight;
+	float Score = 150.f * P.LightAttackWeight;
+
+	if (CurrentThreat.bIsPunishOpportunity)
+	{
+		Score += PunishAttackBonus;
+	}
+
+	return Score;
 }
 
 float UEnemyBrainComponent::ScoreHeavyAttack() const
@@ -306,9 +348,16 @@ float UEnemyBrainComponent::ScoreHeavyAttack() const
 	if (Context.DistanceToTarget > P.HeavyAttackRange)
 		return 0.f;
 
-	return
+	float Score =
 		120.f *
 		P.HeavyAttackWeight;
+
+	if (CurrentThreat.bIsPunishOpportunity)
+	{
+		Score += PunishAttackBonus;
+	}
+
+	return Score;
 }
 
 float UEnemyBrainComponent::ScoreDodge() const
@@ -321,9 +370,16 @@ float UEnemyBrainComponent::ScoreDodge() const
 
 	const FRoleProfile& P = GetProfile();
 
-	return
+	float Score =
 		30.f *
 		P.DodgeWeight;
+
+	if (CurrentThreat.bIsDangerous)
+	{
+		Score += DangerDodgeBonus;
+	}
+
+	return Score;
 }
 
 float UEnemyBrainComponent::ScoreWait() const
@@ -399,12 +455,45 @@ void UEnemyBrainComponent::ExecuteDecision()
 		break;
 
 	case ECombatAction::Dodge:
-
+	{
 		Movement->StopMovement();
 
-		// Defense->StartDodge() later
+		if (Defense)
+		{
+			const FVector ToPlayer =
+				(Context.TargetActor->GetActorLocation() -
+					GetOwner()->GetActorLocation()).GetSafeNormal();
+
+			const FVector Right =
+				FVector::CrossProduct(
+					FVector::UpVector,
+					ToPlayer);
+
+			FVector DodgeDirection;
+
+			switch (FMath::RandRange(0, 2))
+			{
+			case 0:
+
+				DodgeDirection = -ToPlayer;
+				break;
+
+			case 1:
+
+				DodgeDirection = Right;
+				break;
+
+			default:
+
+				DodgeDirection = -Right;
+				break;
+			}
+
+			Defense->StartDodge(DodgeDirection);
+		}
 
 		break;
+	}
 
 	default:
 

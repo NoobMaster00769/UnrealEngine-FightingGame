@@ -64,6 +64,9 @@ public:
     UPROPERTY(BlueprintAssignable)
     FOnDodgeEnded OnDodgeEnded;
 
+    UFUNCTION(BlueprintPure)
+    FVector GetDodgeDirection() const { return DodgeDirection; }
+
 public:
 
     UPROPERTY(EditAnywhere, Category = "Dodge")

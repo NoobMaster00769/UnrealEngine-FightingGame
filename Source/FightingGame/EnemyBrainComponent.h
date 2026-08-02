@@ -4,6 +4,7 @@
 #include "Components/ActorComponent.h"
 #include "TimerManager.h"
 #include "EnemyRoleDataAsset.h"
+#include "ThreatAssessment.h"
 #include "EnemyBrainComponent.generated.h"
 class UCombatComponent;
 class UDefenseComponent;
@@ -11,7 +12,7 @@ class UHealthComponent;
 class UEnemyMovementComponent;
 class UHitReactionComponent;
 class AActor;
-
+class UCombatPerceptionComponent;
 
 UENUM(BlueprintType)
 enum class ECombatAction : uint8
@@ -83,6 +84,9 @@ protected:
 
 public:
 
+    UPROPERTY(BlueprintReadOnly)
+    FThreatAssessment CurrentThreat;
+
     UFUNCTION(BlueprintCallable)
     void InitializeBrain();
 
@@ -97,6 +101,15 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Brain")
     float ThinkInterval = 0.25f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Brain")
+    float ThreatDangerRange = 300.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Brain")
+    float DangerDodgeBonus = 150.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Brain")
+    float PunishAttackBonus = 60.f;
 
     UPROPERTY(EditAnywhere, Category = "Debug")
     bool bDebugBrain = true;
@@ -140,6 +153,9 @@ protected:
 
 private:
     UPROPERTY()
+    UCombatPerceptionComponent* Perception = nullptr;
+
+    UPROPERTY()
     UCombatComponent* Combat;
 
     UPROPERTY()
@@ -151,4 +167,6 @@ private:
     UPROPERTY()
     UEnemyMovementComponent* Movement;
     FTimerHandle ThinkTimer;
+private:
+    FCombatThreatAnalyzer ThreatAnalyzer;
 };
