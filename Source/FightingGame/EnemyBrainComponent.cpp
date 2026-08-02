@@ -4,6 +4,7 @@
 #include "CombatComponent.h"
 #include "DefenseComponent.h"
 #include "HealthComponent.h"
+#include "HitReactionComponent.h"
 #include "EnemyMovementComponent.h"
 #include "GameFramework/Actor.h"
 
@@ -27,6 +28,9 @@ void UEnemyBrainComponent::BeginPlay()
 
 	Movement =
 		GetOwner()->FindComponentByClass<UEnemyMovementComponent>();
+
+	HitReaction =
+		GetOwner()->FindComponentByClass<UHitReactionComponent>();
 }
 
 void UEnemyBrainComponent::InitializeBrain()
@@ -65,6 +69,26 @@ void UEnemyBrainComponent::StopThinking()
 
 void UEnemyBrainComponent::Think()
 {
+	if (!Health || !Health->IsAlive())
+	{
+		return;
+	}
+
+	if (Combat && Combat->IsAttacking())
+	{
+		return;
+	}
+
+	if (HitReaction && HitReaction->IsReacting())
+	{
+		return;
+	}
+
+	if (Defense && Defense->IsDodging())
+	{
+		return;
+	}
+
 	UpdateContext();
 
 	EvaluateActions();
@@ -352,6 +376,34 @@ void UEnemyBrainComponent::ExecuteDecision()
 	case ECombatAction::Wait:
 
 		Movement->StopMovement();
+		break;
+
+	case ECombatAction::LightAttack:
+
+		if (Combat && Combat->CanAttack())
+		{
+			Movement->StopMovement();
+			Combat->StartLightAttack();
+		}
+
+		break;
+
+	case ECombatAction::HeavyAttack:
+
+		if (Combat && Combat->CanAttack())
+		{
+			Movement->StopMovement();
+			Combat->StartHeavyAttack();
+		}
+
+		break;
+
+	case ECombatAction::Dodge:
+
+		Movement->StopMovement();
+
+		// Defense->StartDodge() later
+
 		break;
 
 	default:

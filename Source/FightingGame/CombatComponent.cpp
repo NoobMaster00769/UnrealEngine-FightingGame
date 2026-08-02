@@ -50,6 +50,12 @@ void UCombatComponent::StartLightAttack()
 
     OnAttackStarted.Broadcast();
 
+    UE_LOG(
+        LogTemp,
+        Warning,
+        TEXT("[Combat] Broadcast Attack Started (Light)")
+    );
+
     if (bDebugCombat)
     {
         UE_LOG(LogTemp, Warning,
@@ -75,7 +81,11 @@ void UCombatComponent::StartHeavyAttack()
     ClearHitActors();
 
     OnAttackStarted.Broadcast();
-
+    UE_LOG(
+        LogTemp,
+        Warning,
+        TEXT("[Combat] Broadcast Attack Started (Heavy)")
+    );
     if (bDebugCombat)
     {
         UE_LOG(LogTemp, Warning,

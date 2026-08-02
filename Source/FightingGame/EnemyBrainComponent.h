@@ -9,7 +9,7 @@ class UCombatComponent;
 class UDefenseComponent;
 class UHealthComponent;
 class UEnemyMovementComponent;
-
+class UHitReactionComponent;
 class AActor;
 
 
@@ -118,6 +118,9 @@ public:
 
     UFUNCTION(BlueprintCallable)
     void SetTarget(AActor* NewTarget);
+
+    UPROPERTY()
+    UHitReactionComponent* HitReaction = nullptr;
 
 protected:
 
