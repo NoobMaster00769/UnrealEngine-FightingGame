@@ -22,13 +22,12 @@ struct FThreatAssessment
 	float ThreatLevel = 0.f;
 };
 
-// Plain C++ helper, not a UActorComponent - it has no lifecycle of its own,
-// it just converts a Perception snapshot + distance into a judgment.
 class FIGHTINGGAME_API FCombatThreatAnalyzer
 {
 public:
 	FThreatAssessment Evaluate(
 		const FCombatPerceptionSnapshot& Snapshot,
+		bool bDangerousWindowOccurred,
 		float DistanceToTarget,
 		float DangerRange) const;
 };

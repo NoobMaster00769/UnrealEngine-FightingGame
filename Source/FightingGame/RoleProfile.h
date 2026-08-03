@@ -64,4 +64,20 @@ struct FRoleProfile
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Personality")
 	float AttackCooldownMultiplier = 1.f;
+
+	/* Reactive Tuning */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Reactive")
+	float DangerDodgeBonus = 150.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Reactive")
+	float PunishAttackBonus = 60.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Reactive")
+	float CounterBonus = 100.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Reactive")
+	float AggressionDodgeBonusScale = 60.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Reactive")
+	float AggressionApproachPenaltyScale = 0.5f;
 };

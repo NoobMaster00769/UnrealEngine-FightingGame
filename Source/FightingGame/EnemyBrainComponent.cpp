@@ -103,10 +103,29 @@ void UEnemyBrainComponent::Think()
 			TEXT("[Brain->Perception] Recovering=%d CollisionActive=%d TargetFacingMe=%d"),
 			S.bIsRecovering, S.bWeaponCollisionActive, S.bTargetIsFacingMe);
 
+		const bool bDangerLatch = Perception->ConsumeDangerLatch();
+
 		CurrentThreat = ThreatAnalyzer.Evaluate(
 			S,
+			bDangerLatch,
 			Context.DistanceToTarget,
 			ThreatDangerRange);
+
+		if (UDefenseComponent* TargetDefense =
+			Context.TargetActor
+			? Context.TargetActor->FindComponentByClass<UDefenseComponent>()
+			: nullptr)
+		{
+			MemoryTracker.Update(
+				S.bIsAttacking,
+				S.bIsDodging,
+				TargetDefense->GetDodgeDirection(),
+				GetOwner()->GetActorForwardVector(),
+				GetOwner()->GetActorRightVector(),
+				ThinkInterval);
+
+			CurrentMemory = MemoryTracker.GetState();
+		}
 
 		if (bDebugBrain)
 		{
@@ -115,9 +134,15 @@ void UEnemyBrainComponent::Think()
 				CurrentThreat.bIsDangerous,
 				CurrentThreat.bIsPunishOpportunity,
 				CurrentThreat.ThreatLevel);
-		}
-	}
 
+			UE_LOG(LogTemp, Warning,
+				TEXT("[Memory] LeftDodgeBias=%.2f Aggression=%.2f DodgesSeen=%d"),
+				CurrentMemory.LeftDodgeBias,
+				CurrentMemory.AggressionEstimate,
+				CurrentMemory.ObservedDodgeCount);
+		}
+
+	}
 	EvaluateActions();
 
 	ExecuteDecision();
@@ -239,6 +264,13 @@ void UEnemyBrainComponent::EvaluateActions()
 		CurrentDecision.Score = Score;
 		CurrentDecision.Action = ECombatAction::Dodge;
 	}
+
+	Score = ScoreCounter();
+	if (Score > CurrentDecision.Score)
+	{
+		CurrentDecision.Score = Score;
+		CurrentDecision.Action = ECombatAction::Counter;
+	}
 }
 
 float UEnemyBrainComponent::ScoreApproach() const
@@ -260,6 +292,9 @@ float UEnemyBrainComponent::ScoreApproach() const
 			0.5f,
 			1.3f,
 			Context.EnemyHealthPercent);
+
+	// Less eager to close distance against a consistently aggressive target.
+	Score *= FMath::Lerp(1.f, 1.f - P.AggressionApproachPenaltyScale, CurrentMemory.AggressionEstimate);
 
 	return Score;
 }
@@ -329,7 +364,7 @@ float UEnemyBrainComponent::ScoreLightAttack() const
 
 	if (CurrentThreat.bIsPunishOpportunity)
 	{
-		Score += PunishAttackBonus;
+		Score += P.PunishAttackBonus;
 	}
 
 	return Score;
@@ -354,7 +389,7 @@ float UEnemyBrainComponent::ScoreHeavyAttack() const
 
 	if (CurrentThreat.bIsPunishOpportunity)
 	{
-		Score += PunishAttackBonus;
+		Score += P.PunishAttackBonus;
 	}
 
 	return Score;
@@ -376,8 +411,13 @@ float UEnemyBrainComponent::ScoreDodge() const
 
 	if (CurrentThreat.bIsDangerous)
 	{
-		Score += DangerDodgeBonus;
+		Score += P.DangerDodgeBonus;
 	}
+
+	Score += CurrentMemory.AggressionEstimate * P.AggressionDodgeBonusScale;
+
+	// A target that's been consistently aggressive earns a standing
+	// caution bonus, not just a reaction to an active swing.
 
 	return Score;
 }
@@ -390,6 +430,27 @@ float UEnemyBrainComponent::ScoreWait() const
 	return
 		10.f *
 		GetProfile().WaitWeight;
+}
+
+float UEnemyBrainComponent::ScoreCounter() const
+{
+	if (!RoleAsset)
+		return 0.f;
+
+	if (!Context.bCanAttack)
+		return 0.f;
+
+	if (!CurrentThreat.bIsPunishOpportunity)
+		return 0.f;
+
+	const FRoleProfile& P = GetProfile();
+
+	if (Context.DistanceToTarget > P.LightAttackRange)
+		return 0.f;
+
+	return
+		(150.f * P.LightAttackWeight) +
+		P.CounterBonus;
 }
 
 void UEnemyBrainComponent::ExecuteDecision()
@@ -425,6 +486,9 @@ void UEnemyBrainComponent::ExecuteDecision()
 		break;
 
 	case ECombatAction::Strafe:
+
+		// crowd their favored side: strafe toward the side they dodge into.
+		Movement->SetStrafePreference(CurrentMemory.LeftDodgeBias > 0.5f);
 
 		Movement->StrafeAroundTarget(Context.TargetActor);
 		break;
@@ -469,31 +533,26 @@ void UEnemyBrainComponent::ExecuteDecision()
 					FVector::UpVector,
 					ToPlayer);
 
-			FVector DodgeDirection;
+			bLastDodgeWasLeft = !bLastDodgeWasLeft;
 
-			switch (FMath::RandRange(0, 2))
-			{
-			case 0:
-
-				DodgeDirection = -ToPlayer;
-				break;
-
-			case 1:
-
-				DodgeDirection = Right;
-				break;
-
-			default:
-
-				DodgeDirection = -Right;
-				break;
-			}
+			const FVector DodgeDirection =
+				bLastDodgeWasLeft ? -Right : Right;
 
 			Defense->StartDodge(DodgeDirection);
 		}
 
 		break;
 	}
+
+	case ECombatAction::Counter:
+
+		if (Combat && Combat->CanAttack())
+		{
+			Movement->StopMovement();
+			Combat->StartLightAttack();
+		}
+
+		break;
 
 	default:
 

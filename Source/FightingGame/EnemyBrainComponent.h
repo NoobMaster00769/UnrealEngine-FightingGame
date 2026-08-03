@@ -4,6 +4,7 @@
 #include "Components/ActorComponent.h"
 #include "TimerManager.h"
 #include "EnemyRoleDataAsset.h"
+#include "CombatMemory.h"
 #include "ThreatAssessment.h"
 #include "EnemyBrainComponent.generated.h"
 class UCombatComponent;
@@ -24,6 +25,7 @@ enum class ECombatAction : uint8
     LightAttack,
     HeavyAttack,
     Dodge,
+    Counter,
     Wait
 };
 
@@ -105,12 +107,6 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Brain")
     float ThreatDangerRange = 300.f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Brain")
-    float DangerDodgeBonus = 150.f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Brain")
-    float PunishAttackBonus = 60.f;
-
     UPROPERTY(EditAnywhere, Category = "Debug")
     bool bDebugBrain = true;
 
@@ -134,6 +130,9 @@ public:
 
     UPROPERTY()
     UHitReactionComponent* HitReaction = nullptr;
+
+    UPROPERTY(BlueprintReadOnly)
+    FCombatMemoryState CurrentMemory;
 
 protected:
 
@@ -169,4 +168,11 @@ private:
     FTimerHandle ThinkTimer;
 private:
     FCombatThreatAnalyzer ThreatAnalyzer;
+    FCombatMemoryTracker MemoryTracker;
+
+protected:
+    float ScoreCounter() const;
+
+private:
+    bool bLastDodgeWasLeft = false;
 };

@@ -2,14 +2,14 @@
 
 FThreatAssessment FCombatThreatAnalyzer::Evaluate(
 	const FCombatPerceptionSnapshot& Snapshot,
+	bool bDangerousWindowOccurred,
 	float DistanceToTarget,
 	float DangerRange) const
 {
 	FThreatAssessment Result;
 
 	Result.bIsDangerous =
-		Snapshot.bIsAttacking &&
-		Snapshot.bWeaponCollisionActive &&
+		bDangerousWindowOccurred &&
 		DistanceToTarget <= DangerRange;
 
 	Result.bIsPunishOpportunity =

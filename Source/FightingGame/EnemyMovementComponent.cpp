@@ -156,3 +156,8 @@ void UEnemyMovementComponent::SetTarget(AActor* Target)
     CurrentTarget = Target;
 }
 
+void UEnemyMovementComponent::SetStrafePreference(bool bPreferLeft)
+{
+    bStrafeLeft = bPreferLeft;
+}
+

@@ -54,8 +54,6 @@ public:
 	UFUNCTION(BlueprintPure)
 	const FCombatPerceptionSnapshot& GetSnapshot() const { return Snapshot; }
 
-	// Perception runs faster than the brain's Think() cadence so
-	// weapon-collision-window reads don't get missed between decisions.
 	UPROPERTY(EditAnywhere, Category = "Perception")
 	float PerceptionUpdateInterval = 0.05f;
 
@@ -74,4 +72,11 @@ private:
 
 	UPROPERTY(EditAnywhere, Category = "Perception")
 	float FacingToleranceDegrees = 45.f;
+
+public:
+	UFUNCTION(BlueprintCallable)
+	bool ConsumeDangerLatch();
+
+private:
+	bool bDangerLatched = false;
 };

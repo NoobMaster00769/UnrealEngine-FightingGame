@@ -12,7 +12,8 @@ enum class EEnemyRole : uint8
 	Aggressor,
 	Defender,
 	Duelist,
-	Hunter
+	Hunter,
+	Coward
 };
 
 class UUserDefinedStruct;

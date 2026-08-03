@@ -50,6 +50,11 @@ void UCombatPerceptionComponent::UpdateSnapshot()
 		Snapshot.bWeaponCollisionActive = TargetCombat->IsWeaponCollisionActive();
 		Snapshot.bCanAttack = TargetCombat->CanAttack();
 		Snapshot.bIsRecovering = Snapshot.bIsAttacking && !Snapshot.bWeaponCollisionActive;
+
+		if (Snapshot.bIsAttacking && Snapshot.bWeaponCollisionActive)
+		{
+			bDangerLatched = true;
+		}
 	}
 
 	if (TargetDefense)
@@ -81,6 +86,13 @@ void UCombatPerceptionComponent::UpdateSnapshot()
 			Snapshot.bIsAttacking, Snapshot.bIsRecovering, Snapshot.bWeaponCollisionActive,
 			Snapshot.bIsDodging, Snapshot.bIsReacting, Snapshot.bIsFacingTarget);
 	}
+}
+
+bool UCombatPerceptionComponent::ConsumeDangerLatch()
+{
+	const bool bResult = bDangerLatched;
+	bDangerLatched = false;
+	return bResult;
 }
 
 bool UCombatPerceptionComponent::IsActorFacingActor(

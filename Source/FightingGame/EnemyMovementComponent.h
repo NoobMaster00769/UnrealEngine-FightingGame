@@ -51,6 +51,9 @@ public:
     UFUNCTION(BlueprintCallable)
     void SetTarget(AActor* Target);
 
+    UFUNCTION(BlueprintCallable)
+    void SetStrafePreference(bool bPreferLeft);
+
 private:
 
     UPROPERTY()
