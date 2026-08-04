@@ -453,6 +453,25 @@ float UEnemyBrainComponent::ScoreCounter() const
 		P.CounterBonus;
 }
 
+bool UEnemyBrainComponent::ShouldContinueCombo() const
+{
+	if (!RoleAsset)
+		return false;
+
+	const FRoleProfile& P = GetProfile();
+
+	if (CurrentThreat.bIsDangerous)
+		return false;
+
+	if (Context.DistanceToTarget > P.LightAttackRange)
+		return false;
+
+	if (!Context.bCanAttack)
+		return false;
+
+	return FMath::FRand() <= P.ComboLikelihood;
+}
+
 void UEnemyBrainComponent::ExecuteDecision()
 {
 	if (bDebugBrain)

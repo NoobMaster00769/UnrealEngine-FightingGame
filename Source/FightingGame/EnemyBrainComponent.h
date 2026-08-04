@@ -101,6 +101,9 @@ public:
     UFUNCTION(BlueprintCallable)
     void Think();
 
+    UFUNCTION(BlueprintCallable)
+    bool ShouldContinueCombo() const;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Brain")
     float ThinkInterval = 0.25f;
 
