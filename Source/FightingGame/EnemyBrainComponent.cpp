@@ -7,6 +7,7 @@
 #include "HitReactionComponent.h"
 #include "EnemyMovementComponent.h"
 #include "CombatPerceptionComponent.h"
+#include "CombatDirectorSubsystem.h"
 #include "GameFramework/Actor.h"
 
 UEnemyBrainComponent::UEnemyBrainComponent()
@@ -160,6 +161,14 @@ void UEnemyBrainComponent::SetTarget(AActor* NewTarget)
 	if (Movement)
 	{
 		Movement->SetTarget(NewTarget);
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		if (UCombatDirectorSubsystem* Director = World->GetSubsystem<UCombatDirectorSubsystem>())
+		{
+			Director->RegisterActiveEnemy(GetOwner());
+		}
 	}
 }
 

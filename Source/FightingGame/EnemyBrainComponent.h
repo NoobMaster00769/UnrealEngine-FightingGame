@@ -14,7 +14,7 @@ class UEnemyMovementComponent;
 class UHitReactionComponent;
 class AActor;
 class UCombatPerceptionComponent;
-
+class UCombatDirectorSubsystem;
 UENUM(BlueprintType)
 enum class ECombatAction : uint8
 {
