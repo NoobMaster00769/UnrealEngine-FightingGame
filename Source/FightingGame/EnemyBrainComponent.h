@@ -137,6 +137,9 @@ public:
     UPROPERTY(BlueprintReadOnly)
     FCombatMemoryState CurrentMemory;
 
+    UFUNCTION(BlueprintCallable)
+    void ApplyRuntimeOverride(const FRoleProfileOverride& Override);
+
 protected:
 
     void UpdateContext();
@@ -169,6 +172,8 @@ private:
     UPROPERTY()
     UEnemyMovementComponent* Movement;
     FTimerHandle ThinkTimer;
+
+
 private:
     FCombatThreatAnalyzer ThreatAnalyzer;
     FCombatMemoryTracker MemoryTracker;
@@ -178,4 +183,11 @@ protected:
 
 private:
     bool bLastDodgeWasLeft = false;
+
+
+
+private:
+    FRoleProfile GetEffectiveProfile() const;
+
+    FRoleProfileOverride RuntimeOverride;
 };

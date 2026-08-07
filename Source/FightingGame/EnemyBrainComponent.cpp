@@ -126,6 +126,13 @@ void UEnemyBrainComponent::Think()
 				ThinkInterval);
 
 			CurrentMemory = MemoryTracker.GetState();
+			if (UWorld* World = GetWorld())
+			{
+				if (UCombatDirectorSubsystem* Director = World->GetSubsystem<UCombatDirectorSubsystem>())
+				{
+					Director->ReportDodgeBiasObservation(CurrentMemory.LeftDodgeBias);
+				}
+			}
 		}
 
 		if (bDebugBrain)
@@ -287,7 +294,7 @@ float UEnemyBrainComponent::ScoreApproach() const
 	if (!RoleAsset)
 		return 0.f;
 
-	const FRoleProfile& P = GetProfile();
+	const FRoleProfile P = GetEffectiveProfile();
 
 	if (Context.DistanceToTarget <= P.PreferredCombatDistance)
 		return 0.f;
@@ -313,7 +320,7 @@ float UEnemyBrainComponent::ScoreRetreat() const
 	if (!RoleAsset)
 		return 0.f;
 
-	const FRoleProfile& P = GetProfile();
+	const FRoleProfile P = GetEffectiveProfile();
 
 	if (Context.DistanceToTarget >= P.RetreatDistance)
 		return 0.f;
@@ -336,7 +343,7 @@ float UEnemyBrainComponent::ScoreStrafe() const
 	if (!RoleAsset)
 		return 0.f;
 
-	const FRoleProfile& P = GetProfile();
+	const FRoleProfile P = GetEffectiveProfile();
 
 	if (Context.DistanceToTarget < P.StrafeMinDistance)
 		return 0.f;
@@ -364,7 +371,7 @@ float UEnemyBrainComponent::ScoreLightAttack() const
 	if (!Context.bCanAttack)
 		return 0.f;
 
-	const FRoleProfile& P = GetProfile();
+	const FRoleProfile P = GetEffectiveProfile();
 
 	if (Context.DistanceToTarget > P.LightAttackRange)
 		return 0.f;
@@ -387,7 +394,7 @@ float UEnemyBrainComponent::ScoreHeavyAttack() const
 	if (!Context.bCanAttack)
 		return 0.f;
 
-	const FRoleProfile& P = GetProfile();
+	const FRoleProfile P = GetEffectiveProfile();
 
 	if (Context.DistanceToTarget > P.HeavyAttackRange)
 		return 0.f;
@@ -412,7 +419,7 @@ float UEnemyBrainComponent::ScoreDodge() const
 	if (!Context.bCanDodge)
 		return 0.f;
 
-	const FRoleProfile& P = GetProfile();
+	const FRoleProfile P = GetEffectiveProfile();
 
 	float Score =
 		30.f *
@@ -452,7 +459,7 @@ float UEnemyBrainComponent::ScoreCounter() const
 	if (!CurrentThreat.bIsPunishOpportunity)
 		return 0.f;
 
-	const FRoleProfile& P = GetProfile();
+	const FRoleProfile P = GetEffectiveProfile();
 
 	if (Context.DistanceToTarget > P.LightAttackRange)
 		return 0.f;
@@ -589,4 +596,26 @@ void UEnemyBrainComponent::ExecuteDecision()
 	}
 
 	OnDecisionMade.Broadcast(CurrentDecision.Action);
+}
+
+void UEnemyBrainComponent::ApplyRuntimeOverride(const FRoleProfileOverride& Override)
+{
+	RuntimeOverride = Override;
+	RuntimeOverride.DangerDodgeBonusMult = FMath::Clamp(RuntimeOverride.DangerDodgeBonusMult, 0.5f, 2.f);
+	RuntimeOverride.PunishAttackBonusMult = FMath::Clamp(RuntimeOverride.PunishAttackBonusMult, 0.5f, 2.f);
+	RuntimeOverride.CounterBonusMult = FMath::Clamp(RuntimeOverride.CounterBonusMult, 0.5f, 2.f);
+}
+
+FRoleProfile UEnemyBrainComponent::GetEffectiveProfile() const
+{
+	FRoleProfile Effective = GetProfile();
+
+	if (RuntimeOverride.bActive)
+	{
+		Effective.DangerDodgeBonus *= RuntimeOverride.DangerDodgeBonusMult;
+		Effective.PunishAttackBonus *= RuntimeOverride.PunishAttackBonusMult;
+		Effective.CounterBonus *= RuntimeOverride.CounterBonusMult;
+	}
+
+	return Effective;
 }

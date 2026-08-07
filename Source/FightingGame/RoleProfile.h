@@ -81,3 +81,20 @@ struct FRoleProfile
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Reactive")
 	float AggressionApproachPenaltyScale = 0.5f;
 };
+USTRUCT(BlueprintType)
+struct FRoleProfileOverride
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite)
+	float DangerDodgeBonusMult = 1.f;
+
+	UPROPERTY(BlueprintReadWrite)
+	float PunishAttackBonusMult = 1.f;
+
+	UPROPERTY(BlueprintReadWrite)
+	float CounterBonusMult = 1.f;
+
+	UPROPERTY(BlueprintReadWrite)
+	bool bActive = false;
+};

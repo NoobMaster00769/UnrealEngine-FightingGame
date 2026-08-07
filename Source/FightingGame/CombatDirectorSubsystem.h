@@ -1,6 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
+#include "EnemyRoleDataAsset.h"
 #include "CombatDirectorSubsystem.generated.h"
 
 class UCombatComponent;
@@ -25,6 +26,9 @@ struct FPlayerCombatStats
 
 	UPROPERTY(BlueprintReadOnly)
 	float PreferredDistance = 250.f;   // EWMA of sampled distance while engaged
+
+	UPROPERTY(BlueprintReadOnly)
+	float GlobalLeftDodgeBias = 0.5f;
 };
 
 UCLASS()
@@ -54,6 +58,37 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Debug")
 	bool bDebugDirector = true;
 
+	UFUNCTION(BlueprintCallable)
+	bool TrySpendBudget(EEnemyRole Role);
+
+	UFUNCTION(BlueprintPure)
+	EEnemyRole ChooseNextRole() const;
+
+	UFUNCTION(BlueprintPure)
+	float GetCurrentBudget() const { return CurrentBudget; }
+
+	UPROPERTY(EditAnywhere, Category = "Director")
+	float BudgetGrowthPerSecond = 0.4f;
+
+	UPROPERTY(EditAnywhere, Category = "Director")
+	float MaxBudget = 20.f;
+
+	UFUNCTION(BlueprintCallable)
+	void ReportDodgeBiasObservation(float LeftBias);
+
+	UPROPERTY(EditAnywhere, Category = "Director")
+	float TensionPeriodSeconds = 45.f;
+
+	UPROPERTY(EditAnywhere, Category = "Director")
+	float TensionAmplitude = 0.3f;
+
+private:
+	float GetRoleCost(EEnemyRole Role) const;
+	void TickBudget();
+
+	float CurrentBudget = 3.f;
+	FTimerHandle BudgetTimer;
+	float BudgetTickInterval = 1.f;
 private:
 	UFUNCTION()
 	void HandlePlayerSuccessfulHit(AActor* HitActor);
@@ -86,4 +121,7 @@ private:
 	float HitStatsDecayAlpha = 0.4f;   // damage dealt/taken - big steps, rare events
 
 	float StatsDecayRate = 0.1f;
+
+	float ElapsedTime = 0.f;
 };
+

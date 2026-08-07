@@ -12,6 +12,115 @@ void UCombatDirectorSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		&UCombatDirectorSubsystem::SampleDistances,
 		SampleInterval,
 		true);
+
+	InWorld.GetTimerManager().SetTimer(
+		BudgetTimer,
+		this,
+		&UCombatDirectorSubsystem::TickBudget,
+		BudgetTickInterval,
+		true);
+}
+
+void UCombatDirectorSubsystem::TickBudget()
+{
+	ElapsedTime += BudgetTickInterval;
+
+	const float TensionMultiplier =
+		1.f + TensionAmplitude * FMath::Sin(2.f * PI * ElapsedTime / TensionPeriodSeconds);
+
+	CurrentBudget = FMath::Min(
+		CurrentBudget + (BudgetGrowthPerSecond * TensionMultiplier * BudgetTickInterval),
+		MaxBudget);
+}
+
+void UCombatDirectorSubsystem::ReportDodgeBiasObservation(float LeftBias)
+{
+	Stats.GlobalLeftDodgeBias = FMath::Lerp(Stats.GlobalLeftDodgeBias, LeftBias, 0.1f);
+}
+
+float UCombatDirectorSubsystem::GetRoleCost(EEnemyRole Role) const
+{
+	switch (Role)
+	{
+	case EEnemyRole::Coward:    return 1.f;
+	case EEnemyRole::Duelist:   return 2.f;
+	case EEnemyRole::Defender:  return 2.f;
+	case EEnemyRole::Hunter:    return 3.f;
+	case EEnemyRole::Aggressor: return 3.f;
+	default:                    return 2.f;
+	}
+}
+
+bool UCombatDirectorSubsystem::TrySpendBudget(EEnemyRole Role)
+{
+	const float Cost = GetRoleCost(Role);
+
+	if (CurrentBudget < Cost)
+	{
+		return false;
+	}
+
+	CurrentBudget -= Cost;
+	return true;
+}
+
+EEnemyRole UCombatDirectorSubsystem::ChooseNextRole() const
+{
+	TMap<EEnemyRole, float> Weights;
+	Weights.Add(EEnemyRole::Aggressor, 1.f);
+	Weights.Add(EEnemyRole::Defender, 1.f);
+	Weights.Add(EEnemyRole::Duelist, 1.f);
+	Weights.Add(EEnemyRole::Hunter, 1.f);
+	Weights.Add(EEnemyRole::Coward, 1.f);
+
+	// Player is pressuring hard (dealing damage, closing distance) -> counter with defensive roles.
+	const bool bPlayerAggressive = Stats.DamageDealtEstimate > 15.f && Stats.PreferredDistance < 200.f;
+	if (bPlayerAggressive)
+	{
+		Weights[EEnemyRole::Defender] += 1.5f;
+		Weights[EEnemyRole::Coward] += 0.5f;
+		Weights[EEnemyRole::Aggressor] -= 0.5f;
+	}
+
+	// Player is passive / keeping distance -> force engagement.
+	const bool bPlayerPassive = Stats.PreferredDistance > 300.f;
+	if (bPlayerPassive)
+	{
+		Weights[EEnemyRole::Aggressor] += 1.5f;
+		Weights[EEnemyRole::Hunter] += 1.f;
+	}
+
+	// Player is precise -> harder-to-hit and punish-specialist roles.
+	if (Stats.Accuracy > 0.7f)
+	{
+		Weights[EEnemyRole::Defender] += 0.75f;
+		Weights[EEnemyRole::Hunter] += 0.75f;
+	}
+
+	float TotalWeight = 0.f;
+	for (const auto& Pair : Weights)
+	{
+		TotalWeight += FMath::Max(Pair.Value, 0.f);
+	}
+
+	if (TotalWeight <= 0.f)
+	{
+		return EEnemyRole::Duelist;
+	}
+
+	float Roll = FMath::FRandRange(0.f, TotalWeight);
+
+	for (const auto& Pair : Weights)
+	{
+		const float W = FMath::Max(Pair.Value, 0.f);
+		if (Roll <= W)
+		{
+			return Pair.Key;
+		}
+		Roll -= W;
+	}
+
+	return EEnemyRole::Duelist;
 }
 
 void UCombatDirectorSubsystem::RegisterPlayerCombat(AActor* InPlayerActor, UCombatComponent* InPlayerCombat)
