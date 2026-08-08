@@ -29,6 +29,8 @@ struct FCombatPerceptionSnapshot
 	UPROPERTY(BlueprintReadOnly) bool bTargetIsFacingMe = false;
 
 	UPROPERTY(BlueprintReadOnly) bool bTargetValid = false;
+
+	UPROPERTY(BlueprintReadOnly) bool bTargetNoticed = false;
 };
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
@@ -60,9 +62,16 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Debug")
 	bool bDebugPerception = false;
 
+	UPROPERTY(EditAnywhere, Category = "Perception")
+	float NoticeDelaySeconds = 0.4f;
+
+	UPROPERTY(EditAnywhere, Category = "Perception")
+	float VisionConeHalfAngleDegrees = 100.f;
+
 private:
-	void UpdateSnapshot();
+	void UpdateSnapshot(float DeltaTime);
 	bool IsActorFacingActor(const AActor* Observer, const AActor* Target, float ToleranceDegrees) const;
+	float TimeTargetVisible = 0.f;
 
 private:
 	UPROPERTY()

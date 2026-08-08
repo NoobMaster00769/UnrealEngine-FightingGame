@@ -82,6 +82,18 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Director")
 	float TensionAmplitude = 0.3f;
 
+	UFUNCTION(BlueprintCallable)
+	bool TryAcquireAttackToken(AActor* Enemy);
+
+	UFUNCTION(BlueprintCallable)
+	void ReleaseAttackToken(AActor* Enemy);
+
+	UPROPERTY(EditAnywhere, Category = "Director")
+	int32 MaxConcurrentAttackers = 2;
+
+private:
+	TArray<AActor*> ActiveAttackers;
+
 private:
 	float GetRoleCost(EEnemyRole Role) const;
 	void TickBudget();

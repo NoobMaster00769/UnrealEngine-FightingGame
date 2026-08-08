@@ -15,6 +15,7 @@ class UHitReactionComponent;
 class AActor;
 class UCombatPerceptionComponent;
 class UCombatDirectorSubsystem;
+
 UENUM(BlueprintType)
 enum class ECombatAction : uint8
 {
@@ -130,6 +131,8 @@ public:
 
     UFUNCTION(BlueprintCallable)
     void SetTarget(AActor* NewTarget);
+    UFUNCTION(BlueprintPure)
+    bool HasAttackToken() const { return bHasAttackToken; }
 
     UPROPERTY()
     UHitReactionComponent* HitReaction = nullptr;
@@ -172,6 +175,16 @@ private:
     UPROPERTY()
     UEnemyMovementComponent* Movement;
     FTimerHandle ThinkTimer;
+
+    bool bHasAttackToken = false;
+
+    float GetNearbyAllyPenalty() const;
+
+    UPROPERTY(EditAnywhere, Category = "Brain")
+    float AllyProximityRadius = 150.f;
+
+    UFUNCTION()
+    void HandleOwnAttackEnded();
 
 
 private:

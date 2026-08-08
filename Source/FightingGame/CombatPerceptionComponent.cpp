@@ -27,10 +27,10 @@ void UCombatPerceptionComponent::TickComponent(
 	FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-	UpdateSnapshot();
+	UpdateSnapshot(DeltaTime);
 }
 
-void UCombatPerceptionComponent::UpdateSnapshot()
+void UCombatPerceptionComponent::UpdateSnapshot(float DeltaTime)
 {
 	if (!TargetActor)
 	{
@@ -77,6 +77,20 @@ void UCombatPerceptionComponent::UpdateSnapshot()
 
 		Snapshot.bTargetIsFacingMe =
 			IsActorFacingActor(TargetActor, Owner, FacingToleranceDegrees);
+
+		const bool bTargetInVisionCone =
+			IsActorFacingActor(Owner, TargetActor, VisionConeHalfAngleDegrees);
+
+		if (bTargetInVisionCone)
+		{
+			TimeTargetVisible += DeltaTime;
+		}
+		else
+		{
+			TimeTargetVisible = 0.f;
+		}
+
+		Snapshot.bTargetNoticed = TimeTargetVisible >= NoticeDelaySeconds;
 	}
 
 	if (bDebugPerception)

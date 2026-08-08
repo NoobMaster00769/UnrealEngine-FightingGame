@@ -260,3 +260,26 @@ void UCombatDirectorSubsystem::SampleDistances()
 			Stats.DamageDealtEstimate, Stats.DamageTakenEstimate, Stats.Accuracy, Stats.PreferredDistance);
 	}
 }
+
+bool UCombatDirectorSubsystem::TryAcquireAttackToken(AActor* Enemy)
+{
+	ActiveAttackers.RemoveAll([](AActor* A) { return !IsValid(A); });
+
+	if (ActiveAttackers.Contains(Enemy))
+	{
+		return true;
+	}
+
+	if (ActiveAttackers.Num() >= MaxConcurrentAttackers)
+	{
+		return false;
+	}
+
+	ActiveAttackers.Add(Enemy);
+	return true;
+}
+
+void UCombatDirectorSubsystem::ReleaseAttackToken(AActor* Enemy)
+{
+	ActiveAttackers.Remove(Enemy);
+}

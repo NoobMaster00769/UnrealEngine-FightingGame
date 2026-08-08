@@ -7,6 +7,7 @@
 #include "HitReactionComponent.h"
 #include "EnemyMovementComponent.h"
 #include "CombatPerceptionComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "CombatDirectorSubsystem.h"
 #include "GameFramework/Actor.h"
 
@@ -19,23 +20,28 @@ void UEnemyBrainComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	Combat =
-		GetOwner()->FindComponentByClass<UCombatComponent>();
+	Combat = GetOwner()->FindComponentByClass<UCombatComponent>();
+	Defense = GetOwner()->FindComponentByClass<UDefenseComponent>();
+	Health = GetOwner()->FindComponentByClass<UHealthComponent>();
+	Movement = GetOwner()->FindComponentByClass<UEnemyMovementComponent>();
+	HitReaction = GetOwner()->FindComponentByClass<UHitReactionComponent>();
+	Perception = GetOwner()->FindComponentByClass<UCombatPerceptionComponent>();
 
-	Defense =
-		GetOwner()->FindComponentByClass<UDefenseComponent>();
+	if (Combat)
+	{
+		Combat->OnAttackEnded.AddDynamic(this, &UEnemyBrainComponent::HandleOwnAttackEnded);
+	}
+}
 
-	Health =
-		GetOwner()->FindComponentByClass<UHealthComponent>();
-
-	Movement =
-		GetOwner()->FindComponentByClass<UEnemyMovementComponent>();
-
-	HitReaction =
-		GetOwner()->FindComponentByClass<UHitReactionComponent>();
-
-	Perception =
-		GetOwner()->FindComponentByClass<UCombatPerceptionComponent>();
+void UEnemyBrainComponent::HandleOwnAttackEnded()
+{
+	if (UWorld* World = GetWorld())
+	{
+		if (UCombatDirectorSubsystem* Director = World->GetSubsystem<UCombatDirectorSubsystem>())
+		{
+			Director->ReleaseAttackToken(GetOwner());
+		}
+	}
 }
 
 void UEnemyBrainComponent::InitializeBrain()
@@ -94,6 +100,15 @@ void UEnemyBrainComponent::Think()
 		return;
 	}
 
+	if (Perception && !Perception->GetSnapshot().bTargetNoticed)
+	{
+		if (Movement)
+		{
+			Movement->StopMovement();
+		}
+		return;
+	}
+
 	UpdateContext();
 
 	if (Perception)
@@ -148,6 +163,11 @@ void UEnemyBrainComponent::Think()
 				CurrentMemory.LeftDodgeBias,
 				CurrentMemory.AggressionEstimate,
 				CurrentMemory.ObservedDodgeCount);
+
+			UE_LOG(LogTemp, Warning,
+				TEXT("[Scores] App=%.0f Ret=%.0f Str=%.0f Lgt=%.0f Hvy=%.0f Dog=%.0f Cnt=%.0f Wait=%.0f Token=%d"),
+				ScoreApproach(), ScoreRetreat(), ScoreStrafe(), ScoreLightAttack(),
+				ScoreHeavyAttack(), ScoreDodge(), ScoreCounter(), ScoreWait(), bHasAttackToken);
 		}
 
 	}
@@ -234,58 +254,56 @@ const FRoleProfile& UEnemyBrainComponent::GetProfile() const
 
 void UEnemyBrainComponent::EvaluateActions()
 {
+	bHasAttackToken = false;
+
+	if (UWorld* World = GetWorld())
+	{
+		if (UCombatDirectorSubsystem* Director = World->GetSubsystem<UCombatDirectorSubsystem>())
+		{
+			bHasAttackToken = Director->TryAcquireAttackToken(GetOwner());
+		}
+	}
+
 	CurrentDecision.Action = ECombatAction::Wait;
 	CurrentDecision.Score = ScoreWait();
 
 	float Score = 0.f;
 
 	Score = ScoreApproach();
-	if (Score > CurrentDecision.Score)
-	{
-		CurrentDecision.Score = Score;
-		CurrentDecision.Action = ECombatAction::Approach;
-	}
+	if (Score > CurrentDecision.Score) { CurrentDecision.Score = Score; CurrentDecision.Action = ECombatAction::Approach; }
 
 	Score = ScoreRetreat();
-	if (Score > CurrentDecision.Score)
-	{
-		CurrentDecision.Score = Score;
-		CurrentDecision.Action = ECombatAction::Retreat;
-	}
+	if (Score > CurrentDecision.Score) { CurrentDecision.Score = Score; CurrentDecision.Action = ECombatAction::Retreat; }
 
 	Score = ScoreStrafe();
-	if (Score > CurrentDecision.Score)
-	{
-		CurrentDecision.Score = Score;
-		CurrentDecision.Action = ECombatAction::Strafe;
-	}
+	if (Score > CurrentDecision.Score) { CurrentDecision.Score = Score; CurrentDecision.Action = ECombatAction::Strafe; }
 
 	Score = ScoreLightAttack();
-	if (Score > CurrentDecision.Score)
-	{
-		CurrentDecision.Score = Score;
-		CurrentDecision.Action = ECombatAction::LightAttack;
-	}
+	if (Score > CurrentDecision.Score) { CurrentDecision.Score = Score; CurrentDecision.Action = ECombatAction::LightAttack; }
 
 	Score = ScoreHeavyAttack();
-	if (Score > CurrentDecision.Score)
-	{
-		CurrentDecision.Score = Score;
-		CurrentDecision.Action = ECombatAction::HeavyAttack;
-	}
+	if (Score > CurrentDecision.Score) { CurrentDecision.Score = Score; CurrentDecision.Action = ECombatAction::HeavyAttack; }
 
 	Score = ScoreDodge();
-	if (Score > CurrentDecision.Score)
-	{
-		CurrentDecision.Score = Score;
-		CurrentDecision.Action = ECombatAction::Dodge;
-	}
+	if (Score > CurrentDecision.Score) { CurrentDecision.Score = Score; CurrentDecision.Action = ECombatAction::Dodge; }
 
 	Score = ScoreCounter();
-	if (Score > CurrentDecision.Score)
+	if (Score > CurrentDecision.Score) { CurrentDecision.Score = Score; CurrentDecision.Action = ECombatAction::Counter; }
+
+	const bool bCommittedToAttack =
+		CurrentDecision.Action == ECombatAction::LightAttack ||
+		CurrentDecision.Action == ECombatAction::HeavyAttack ||
+		CurrentDecision.Action == ECombatAction::Counter;
+
+	if (!bCommittedToAttack)
 	{
-		CurrentDecision.Score = Score;
-		CurrentDecision.Action = ECombatAction::Counter;
+		if (UWorld* World = GetWorld())
+		{
+			if (UCombatDirectorSubsystem* Director = World->GetSubsystem<UCombatDirectorSubsystem>())
+			{
+				Director->ReleaseAttackToken(GetOwner());
+			}
+		}
 	}
 }
 
@@ -312,6 +330,8 @@ float UEnemyBrainComponent::ScoreApproach() const
 	// Less eager to close distance against a consistently aggressive target.
 	Score *= FMath::Lerp(1.f, 1.f - P.AggressionApproachPenaltyScale, CurrentMemory.AggressionEstimate);
 
+	Score *= GetNearbyAllyPenalty();
+
 	return Score;
 }
 
@@ -329,11 +349,8 @@ float UEnemyBrainComponent::ScoreRetreat() const
 		(P.RetreatDistance - Context.DistanceToTarget)
 		* P.RetreatWeight;
 
-	Score *=
-		FMath::Lerp(
-			2.0f,
-			0.4f,
-			Context.EnemyHealthPercent);
+	// longer by creating distance rather than committing to a bad trade.
+	Score *= FMath::Lerp(2.5f, 1.f, Context.EnemyHealthPercent);
 
 	return Score;
 }
@@ -360,6 +377,8 @@ float UEnemyBrainComponent::ScoreStrafe() const
 			1.2f,
 			Context.EnemyHealthPercent);
 
+	Score *= GetNearbyAllyPenalty();
+
 	return Score;
 }
 
@@ -371,9 +390,15 @@ float UEnemyBrainComponent::ScoreLightAttack() const
 	if (!Context.bCanAttack)
 		return 0.f;
 
+	if (!bHasAttackToken)
+		return 0.f;
+
 	const FRoleProfile P = GetEffectiveProfile();
 
 	if (Context.DistanceToTarget > P.LightAttackRange)
+		return 0.f;
+
+	if (Perception && Perception->GetSnapshot().bIsInvulnerable)
 		return 0.f;
 
 	float Score = 150.f * P.LightAttackWeight;
@@ -381,6 +406,16 @@ float UEnemyBrainComponent::ScoreLightAttack() const
 	if (CurrentThreat.bIsPunishOpportunity)
 	{
 		Score += P.PunishAttackBonus;
+	}
+
+	if (Perception && !Perception->GetSnapshot().bTargetIsFacingMe)
+	{
+		Score += P.BlindSideAttackBonus;
+	}
+
+	if (Context.TargetHealthPercent < 0.3f)
+	{
+		Score += P.ExecuteBonusScale * (1.f - Context.TargetHealthPercent);
 	}
 
 	return Score;
@@ -394,18 +429,32 @@ float UEnemyBrainComponent::ScoreHeavyAttack() const
 	if (!Context.bCanAttack)
 		return 0.f;
 
+	if (!bHasAttackToken)
+		return 0.f;
+
 	const FRoleProfile P = GetEffectiveProfile();
 
 	if (Context.DistanceToTarget > P.HeavyAttackRange)
 		return 0.f;
 
-	float Score =
-		120.f *
-		P.HeavyAttackWeight;
+	if (Perception && Perception->GetSnapshot().bIsInvulnerable)
+		return 0.f;
+
+	float Score = 120.f * P.HeavyAttackWeight;
 
 	if (CurrentThreat.bIsPunishOpportunity)
 	{
 		Score += P.PunishAttackBonus;
+	}
+
+	if (Perception && !Perception->GetSnapshot().bTargetIsFacingMe)
+	{
+		Score += P.BlindSideAttackBonus;
+	}
+
+	if (Context.TargetHealthPercent < 0.3f)
+	{
+		Score += P.ExecuteBonusScale * (1.f - Context.TargetHealthPercent);
 	}
 
 	return Score;
@@ -443,9 +492,16 @@ float UEnemyBrainComponent::ScoreWait() const
 	if (!RoleAsset)
 		return 1.f;
 
-	return
-		10.f *
-		GetProfile().WaitWeight;
+	const FRoleProfile P = GetEffectiveProfile();
+
+	float Score = 10.f * P.WaitWeight;
+
+	if (!bHasAttackToken && Context.DistanceToTarget > P.StrafeMinDistance)
+	{
+		Score *= 2.f;
+	}
+
+	return Score;
 }
 
 float UEnemyBrainComponent::ScoreCounter() const
@@ -454,6 +510,12 @@ float UEnemyBrainComponent::ScoreCounter() const
 		return 0.f;
 
 	if (!Context.bCanAttack)
+		return 0.f;
+
+	if (!Context.bCanAttack)
+		return 0.f;
+
+	if (!bHasAttackToken)
 		return 0.f;
 
 	if (!CurrentThreat.bIsPunishOpportunity)
@@ -618,4 +680,28 @@ FRoleProfile UEnemyBrainComponent::GetEffectiveProfile() const
 	}
 
 	return Effective;
+}
+
+float UEnemyBrainComponent::GetNearbyAllyPenalty() const
+{
+	if (!GetWorld() || !GetOwner())
+		return 1.f;
+
+	TArray<AActor*> AllEnemies;
+	UGameplayStatics::GetAllActorsWithTag(GetWorld(), FName("Enemy"), AllEnemies);
+
+	int32 NearbyAllies = 0;
+
+	for (AActor* Other : AllEnemies)
+	{
+		if (Other && Other != GetOwner())
+		{
+			if (FVector::Dist(Other->GetActorLocation(), GetOwner()->GetActorLocation()) < AllyProximityRadius)
+			{
+				NearbyAllies++;
+			}
+		}
+	}
+
+	return FMath::Max(1.f - (NearbyAllies * 0.25f), 0.25f);
 }
