@@ -123,6 +123,34 @@ EEnemyRole UCombatDirectorSubsystem::ChooseNextRole() const
 	return EEnemyRole::Duelist;
 }
 
+float UCombatDirectorSubsystem::GetFlankSlotAngle(AActor* Enemy) const
+{
+	TArray<AActor*> ValidEnemies;
+	for (AActor* E : ActiveEnemies)
+	{
+		if (IsValid(E))
+		{
+			ValidEnemies.Add(E);
+		}
+	}
+
+	// Stable sort by unique ID so each enemy keeps a consistent slot tick to
+	// tick, and the roster only re-splits 360 degrees when someone joins/dies.
+	ValidEnemies.Sort([](const AActor& A, const AActor& B)
+		{
+			return A.GetUniqueID() < B.GetUniqueID();
+		});
+
+	const int32 Index = ValidEnemies.IndexOfByKey(Enemy);
+
+	if (Index == INDEX_NONE || ValidEnemies.Num() == 0)
+	{
+		return 0.f;
+	}
+
+	return (360.f / ValidEnemies.Num()) * Index;
+}
+
 void UCombatDirectorSubsystem::RegisterPlayerCombat(AActor* InPlayerActor, UCombatComponent* InPlayerCombat)
 {
 	if (!InPlayerActor || !InPlayerCombat)

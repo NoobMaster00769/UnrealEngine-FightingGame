@@ -254,6 +254,8 @@ const FRoleProfile& UEnemyBrainComponent::GetProfile() const
 
 void UEnemyBrainComponent::EvaluateActions()
 {
+	const ECombatAction PreviousAction = CurrentDecision.Action;
+
 	bHasAttackToken = false;
 
 	if (UWorld* World = GetWorld())
@@ -264,30 +266,33 @@ void UEnemyBrainComponent::EvaluateActions()
 		}
 	}
 
+	auto Stick = [PreviousAction](ECombatAction Action, float Score) -> float
+		{
+			return (Action == PreviousAction) ? Score * 1.15f : Score;
+		};
+
 	CurrentDecision.Action = ECombatAction::Wait;
-	CurrentDecision.Score = ScoreWait();
+	CurrentDecision.Score = Stick(ECombatAction::Wait, ScoreWait());
 
-	float Score = 0.f;
-
-	Score = ScoreApproach();
+	float Score = Stick(ECombatAction::Approach, ScoreApproach());
 	if (Score > CurrentDecision.Score) { CurrentDecision.Score = Score; CurrentDecision.Action = ECombatAction::Approach; }
 
-	Score = ScoreRetreat();
+	Score = Stick(ECombatAction::Retreat, ScoreRetreat());
 	if (Score > CurrentDecision.Score) { CurrentDecision.Score = Score; CurrentDecision.Action = ECombatAction::Retreat; }
 
-	Score = ScoreStrafe();
+	Score = Stick(ECombatAction::Strafe, ScoreStrafe());
 	if (Score > CurrentDecision.Score) { CurrentDecision.Score = Score; CurrentDecision.Action = ECombatAction::Strafe; }
 
-	Score = ScoreLightAttack();
+	Score = Stick(ECombatAction::LightAttack, ScoreLightAttack());
 	if (Score > CurrentDecision.Score) { CurrentDecision.Score = Score; CurrentDecision.Action = ECombatAction::LightAttack; }
 
-	Score = ScoreHeavyAttack();
+	Score = Stick(ECombatAction::HeavyAttack, ScoreHeavyAttack());
 	if (Score > CurrentDecision.Score) { CurrentDecision.Score = Score; CurrentDecision.Action = ECombatAction::HeavyAttack; }
 
-	Score = ScoreDodge();
+	Score = Stick(ECombatAction::Dodge, ScoreDodge());
 	if (Score > CurrentDecision.Score) { CurrentDecision.Score = Score; CurrentDecision.Action = ECombatAction::Dodge; }
 
-	Score = ScoreCounter();
+	Score = Stick(ECombatAction::Counter, ScoreCounter());
 	if (Score > CurrentDecision.Score) { CurrentDecision.Score = Score; CurrentDecision.Action = ECombatAction::Counter; }
 
 	const bool bCommittedToAttack =
@@ -314,23 +319,28 @@ float UEnemyBrainComponent::ScoreApproach() const
 
 	const FRoleProfile P = GetEffectiveProfile();
 
-	if (Context.DistanceToTarget <= P.PreferredCombatDistance)
+	// If we have the token and can attack, keep closing until actually within
+	// striking range - not just the general preferred distance. Otherwise we
+	// stall in a dead zone: too far to attack, not far enough to trigger Approach.
+	float EngageDistance = P.PreferredCombatDistance;
+
+	if (bHasAttackToken && Context.bCanAttack)
+	{
+		EngageDistance = FMath::Min(P.PreferredCombatDistance, P.LightAttackRange * 0.85f);
+	}
+
+	if (Context.DistanceToTarget <= EngageDistance)
 		return 0.f;
 
 	float Score =
-		(Context.DistanceToTarget - P.PreferredCombatDistance)
+		(Context.DistanceToTarget - EngageDistance)
 		* P.ApproachWeight;
 
-	Score *=
-		FMath::Lerp(
-			0.5f,
-			1.3f,
-			Context.EnemyHealthPercent);
-
-	// Less eager to close distance against a consistently aggressive target.
+	Score *= FMath::Lerp(0.5f, 1.3f, Context.EnemyHealthPercent);
 	Score *= FMath::Lerp(1.f, 1.f - P.AggressionApproachPenaltyScale, CurrentMemory.AggressionEstimate);
 
-	Score *= GetNearbyAllyPenalty();
+	if (Context.bCanAttack) 
+		Score *= GetNearbyAllyPenalty();
 
 	return Score;
 }
@@ -470,19 +480,19 @@ float UEnemyBrainComponent::ScoreDodge() const
 
 	const FRoleProfile P = GetEffectiveProfile();
 
-	float Score =
-		30.f *
-		P.DodgeWeight;
+	float Score = 15.f * P.DodgeWeight;   
 
 	if (CurrentThreat.bIsDangerous)
 	{
 		Score += P.DangerDodgeBonus;
 	}
 
-	Score += CurrentMemory.AggressionEstimate * P.AggressionDodgeBonusScale;
-
-	// A target that's been consistently aggressive earns a standing
-	// caution bonus, not just a reaction to an active swing.
+	// Standing caution against an aggressive target only makes sense once
+	// they're actually close enough to matter.
+	if (Context.DistanceToTarget <= ThreatDangerRange)
+	{
+		Score += CurrentMemory.AggressionEstimate * P.AggressionDodgeBonusScale;
+	}
 
 	return Score;
 }
@@ -583,12 +593,35 @@ void UEnemyBrainComponent::ExecuteDecision()
 		break;
 
 	case ECombatAction::Strafe:
+	{
+		bool bUsedFlankSlot = false;
 
-		// crowd their favored side: strafe toward the side they dodge into.
-		Movement->SetStrafePreference(CurrentMemory.LeftDodgeBias > 0.5f);
+		if (UWorld* World = GetWorld())
+		{
+			if (UCombatDirectorSubsystem* Director = World->GetSubsystem<UCombatDirectorSubsystem>())
+			{
+				const float SlotAngleDeg = Director->GetFlankSlotAngle(GetOwner());
+				const FRoleProfile P = GetEffectiveProfile();
+				const float AngleRad = FMath::DegreesToRadians(SlotAngleDeg);
 
-		Movement->StrafeAroundTarget(Context.TargetActor);
+				const FVector Offset =
+					FVector(FMath::Cos(AngleRad), FMath::Sin(AngleRad), 0.f) * P.PreferredCombatDistance;
+
+				const FVector SlotPosition = Context.TargetActor->GetActorLocation() + Offset;
+
+				Movement->MoveToFlankSlot(Context.TargetActor, SlotPosition);
+				bUsedFlankSlot = true;
+			}
+		}
+
+		if (!bUsedFlankSlot)
+		{
+			Movement->SetStrafePreference(CurrentMemory.LeftDodgeBias > 0.5f);
+			Movement->StrafeAroundTarget(Context.TargetActor);
+		}
+
 		break;
+	}
 
 	case ECombatAction::Wait:
 

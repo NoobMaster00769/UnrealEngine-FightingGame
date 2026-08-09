@@ -13,7 +13,8 @@ enum class EEnemyMovementMode : uint8
     None UMETA(DisplayName = "None"),
     Approach UMETA(DisplayName = "Approach"),
     Retreat UMETA(DisplayName = "Retreat"),
-    Strafe UMETA(DisplayName = "Strafe")
+    Strafe UMETA(DisplayName = "Strafe"),
+    Flank UMETA(DisplayName = "Flank")
 };
 
 UCLASS(ClassGroup = (AI), meta = (BlueprintSpawnableComponent))
@@ -54,6 +55,9 @@ public:
     UFUNCTION(BlueprintCallable)
     void SetStrafePreference(bool bPreferLeft);
 
+    UFUNCTION(BlueprintCallable)
+    void MoveToFlankSlot(AActor* Target, FVector SlotWorldPosition);
+
 private:
 
     UPROPERTY()
@@ -75,4 +79,6 @@ private:
 
     UPROPERTY(EditAnywhere)
     bool bDebugMovement = true;
+
+    FVector FlankPosition = FVector::ZeroVector;
 };

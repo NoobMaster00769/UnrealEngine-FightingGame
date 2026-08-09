@@ -20,6 +20,17 @@ void UEnemyMovementComponent::BeginPlay()
     bStrafeLeft = FMath::RandBool();
 }
 
+
+void UEnemyMovementComponent::MoveToFlankSlot(AActor* Target, FVector SlotWorldPosition)
+{
+    if (!OwnerCharacter || !Target)
+        return;
+
+    CurrentTarget = Target;
+    FlankPosition = SlotWorldPosition;
+    CurrentMovementMode = EEnemyMovementMode::Flank;
+}
+
 void UEnemyMovementComponent::TickComponent(
 
 
@@ -110,6 +121,18 @@ void UEnemyMovementComponent::TickComponent(
             bStrafeLeft ? -MovementSpeed : MovementSpeed);
 
         break;
+
+    case EEnemyMovementMode::Flank:
+    {
+        FVector ToFlank = FlankPosition - OwnerCharacter->GetActorLocation();
+        ToFlank.Z = 0.f;
+
+        if (!ToFlank.IsNearlyZero(50.f))   // close enough to slot - hold position
+        {
+            OwnerCharacter->AddMovementInput(ToFlank.GetSafeNormal(), MovementSpeed);
+        }
+        break;
+    }
 
     default:
         break;

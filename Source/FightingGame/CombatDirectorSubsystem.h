@@ -91,6 +91,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Director")
 	int32 MaxConcurrentAttackers = 2;
 
+	UFUNCTION(BlueprintPure)
+	float GetFlankSlotAngle(AActor* Enemy) const;
+
 private:
 	TArray<AActor*> ActiveAttackers;
 
