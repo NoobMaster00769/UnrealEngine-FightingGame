@@ -46,6 +46,9 @@ public:
     UFUNCTION(BlueprintCallable)
     void FinishReaction();
 
+    UFUNCTION(BlueprintCallable)
+    void CancelReaction();
+
     UFUNCTION(BlueprintPure)
     bool IsReacting() const;
 

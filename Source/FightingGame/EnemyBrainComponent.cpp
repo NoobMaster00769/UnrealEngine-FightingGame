@@ -35,9 +35,9 @@ void UEnemyBrainComponent::BeginPlay()
 
 void UEnemyBrainComponent::HandleOwnAttackEnded()
 {
-	if (UWorld* World = GetWorld())
+	if (UGameInstance* GI = GetOwner() ? GetOwner()->GetGameInstance() : nullptr)
 	{
-		if (UCombatDirectorSubsystem* Director = World->GetSubsystem<UCombatDirectorSubsystem>())
+		if (UCombatDirectorSubsystem* Director = GI->GetSubsystem<UCombatDirectorSubsystem>())
 		{
 			Director->ReleaseAttackToken(GetOwner());
 		}
@@ -50,6 +50,8 @@ void UEnemyBrainComponent::InitializeBrain()
 		return;
 
 	EnemyRole = RoleAsset->Role;
+
+	ThinkInterval = FMath::Clamp(RoleAsset->RoleProfile.ReactionSpeed, 0.1f, 0.6f);
 }
 
 void UEnemyBrainComponent::StartThinking()
@@ -141,9 +143,9 @@ void UEnemyBrainComponent::Think()
 				ThinkInterval);
 
 			CurrentMemory = MemoryTracker.GetState();
-			if (UWorld* World = GetWorld())
+			if (UGameInstance* GI = GetOwner() ? GetOwner()->GetGameInstance() : nullptr)
 			{
-				if (UCombatDirectorSubsystem* Director = World->GetSubsystem<UCombatDirectorSubsystem>())
+				if (UCombatDirectorSubsystem* Director = GI->GetSubsystem<UCombatDirectorSubsystem>())
 				{
 					Director->ReportDodgeBiasObservation(CurrentMemory.LeftDodgeBias);
 				}
@@ -190,9 +192,9 @@ void UEnemyBrainComponent::SetTarget(AActor* NewTarget)
 		Movement->SetTarget(NewTarget);
 	}
 
-	if (UWorld* World = GetWorld())
+	if (UGameInstance* GI = GetOwner() ? GetOwner()->GetGameInstance() : nullptr)
 	{
-		if (UCombatDirectorSubsystem* Director = World->GetSubsystem<UCombatDirectorSubsystem>())
+		if (UCombatDirectorSubsystem* Director = GI->GetSubsystem<UCombatDirectorSubsystem>())
 		{
 			Director->RegisterActiveEnemy(GetOwner());
 		}
@@ -258,9 +260,9 @@ void UEnemyBrainComponent::EvaluateActions()
 
 	bHasAttackToken = false;
 
-	if (UWorld* World = GetWorld())
+	if (UGameInstance* GI = GetOwner() ? GetOwner()->GetGameInstance() : nullptr)
 	{
-		if (UCombatDirectorSubsystem* Director = World->GetSubsystem<UCombatDirectorSubsystem>())
+		if (UCombatDirectorSubsystem* Director = GI->GetSubsystem<UCombatDirectorSubsystem>())
 		{
 			bHasAttackToken = Director->TryAcquireAttackToken(GetOwner());
 		}
@@ -302,9 +304,9 @@ void UEnemyBrainComponent::EvaluateActions()
 
 	if (!bCommittedToAttack)
 	{
-		if (UWorld* World = GetWorld())
+		if (UGameInstance* GI = GetOwner() ? GetOwner()->GetGameInstance() : nullptr)
 		{
-			if (UCombatDirectorSubsystem* Director = World->GetSubsystem<UCombatDirectorSubsystem>())
+			if (UCombatDirectorSubsystem* Director = GI->GetSubsystem<UCombatDirectorSubsystem>())
 			{
 				Director->ReleaseAttackToken(GetOwner());
 			}
@@ -405,7 +407,7 @@ float UEnemyBrainComponent::ScoreLightAttack() const
 
 	const FRoleProfile P = GetEffectiveProfile();
 
-	if (Context.DistanceToTarget > P.LightAttackRange)
+	if (Context.DistanceToTarget > P.LightAttackRange * 0.75f)
 		return 0.f;
 
 	if (Perception && Perception->GetSnapshot().bIsInvulnerable)
@@ -444,7 +446,7 @@ float UEnemyBrainComponent::ScoreHeavyAttack() const
 
 	const FRoleProfile P = GetEffectiveProfile();
 
-	if (Context.DistanceToTarget > P.HeavyAttackRange)
+	if (Context.DistanceToTarget > P.HeavyAttackRange * 0.75f)
 		return 0.f;
 
 	if (Perception && Perception->GetSnapshot().bIsInvulnerable)
@@ -533,7 +535,7 @@ float UEnemyBrainComponent::ScoreCounter() const
 
 	const FRoleProfile P = GetEffectiveProfile();
 
-	if (Context.DistanceToTarget > P.LightAttackRange)
+	if (Context.DistanceToTarget > P.LightAttackRange * 0.75f)
 		return 0.f;
 
 	return
@@ -596,9 +598,9 @@ void UEnemyBrainComponent::ExecuteDecision()
 	{
 		bool bUsedFlankSlot = false;
 
-		if (UWorld* World = GetWorld())
+		if (UGameInstance* GI = GetOwner() ? GetOwner()->GetGameInstance() : nullptr)
 		{
-			if (UCombatDirectorSubsystem* Director = World->GetSubsystem<UCombatDirectorSubsystem>())
+			if (UCombatDirectorSubsystem* Director = GI->GetSubsystem<UCombatDirectorSubsystem>())
 			{
 				const float SlotAngleDeg = Director->GetFlankSlotAngle(GetOwner());
 				const FRoleProfile P = GetEffectiveProfile();

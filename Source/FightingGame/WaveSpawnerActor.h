@@ -6,6 +6,18 @@
 
 class UEnemyBrainComponent;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
+	FOnWaveStarted,
+	int32,
+	WaveNumber
+);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
+	FOnEnemyKilled,
+	int32,
+	TotalKills
+);
+
 UCLASS()
 class FIGHTINGGAME_API AWaveSpawnerActor : public AActor
 {
@@ -14,8 +26,6 @@ class FIGHTINGGAME_API AWaveSpawnerActor : public AActor
 public:
 	AWaveSpawnerActor();
 
-protected:
-	virtual void BeginPlay() override;
 
 public:
 	UFUNCTION(BlueprintCallable)
@@ -42,6 +52,15 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void TryDirectorSpawn();
 
+	UPROPERTY(BlueprintAssignable, Category = "Waves")
+	FOnWaveStarted OnWaveStarted;
+
+	UPROPERTY(BlueprintAssignable, Category = "Waves")
+	FOnEnemyKilled OnEnemyKilled;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Waves")
+	int32 EnemiesKilled = 0;
+
 	UPROPERTY(EditAnywhere, Category = "Waves")
 	int32 MaxEnemiesPerWave = 4;
 
@@ -57,6 +76,7 @@ public:
 	UFUNCTION()
 	void HandleEnemyDeath();
 
+
 private:
 	int32 AliveCount = 0;
 	bool bWaveInProgress = false;
@@ -69,4 +89,10 @@ private:
 	AActor* GetRandomSpawnPoint() const;
 
 	int32 RotationIndex = 0;
+
+protected:
+	virtual void BeginPlay() override;
+
+	UFUNCTION()
+	void OnGameplayActivatedHandler();
 };

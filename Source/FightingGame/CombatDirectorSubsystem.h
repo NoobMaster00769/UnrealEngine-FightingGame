@@ -1,6 +1,6 @@
 #pragma once
 #include "CoreMinimal.h"
-#include "Subsystems/WorldSubsystem.h"
+#include "Subsystems/GameInstanceSubsystem.h" 
 #include "EnemyRoleDataAsset.h"
 #include "CombatDirectorSubsystem.generated.h"
 
@@ -31,21 +31,42 @@ struct FPlayerCombatStats
 	float GlobalLeftDodgeBias = 0.5f;
 };
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnGameplayActivated);
+
 UCLASS()
-class FIGHTINGGAME_API UCombatDirectorSubsystem : public UWorldSubsystem
+class FIGHTINGGAME_API UCombatDirectorSubsystem : public UGameInstanceSubsystem
 {
 	GENERATED_BODY()
-
 public:
-	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
+	UPROPERTY(BlueprintReadOnly, Category = "Gameplay State")
+	bool bGameplayActive = false;
 
-	// Called once by the player's CombatComponent when it's set up (mirrors
-	// how EnemyBrainComponent already resolves sibling components).
+	UPROPERTY(BlueprintAssignable, Category = "Gameplay State")
+	FOnGameplayActivated OnGameplayActivated;
+
+	UFUNCTION(BlueprintCallable, Category = "Gameplay State")
+	void SetGameplayActive(bool bNewState)
+	{
+		if (bGameplayActive == bNewState) return;
+		bGameplayActive = bNewState;
+		if (bGameplayActive)
+		{
+			OnGameplayActivated.Broadcast();
+		}
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Gameplay State")
+	bool IsGameplayActive() const { return bGameplayActive; }
+public:
+
+	UFUNCTION(BlueprintPure)
+	AActor* FindAttackerWithOpenPerfectDodgeWindow(AActor* Requester, float SearchRadius) const;
+
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+
 	UFUNCTION(BlueprintCallable)
 	void RegisterPlayerCombat(AActor* PlayerActor, UCombatComponent* PlayerCombat);
 
-	// Called once per enemy that engages the player, so distance sampling
-	// and combo-length observation has something concrete to watch.
 	UFUNCTION(BlueprintCallable)
 	void RegisterActiveEnemy(AActor* EnemyActor);
 
@@ -106,10 +127,20 @@ private:
 	float BudgetTickInterval = 1.f;
 private:
 	UFUNCTION()
-	void HandlePlayerSuccessfulHit(AActor* HitActor);
+	void HandlePlayerSuccessfulHit(
+		AActor* HitActor,
+		FVector HitLocation,
+		FVector HitNormal,
+		FVector AttackDirection
+	);
 
 	UFUNCTION()
-	void HandleEnemySuccessfulHit(AActor* HitActor);
+	void HandleEnemySuccessfulHit(
+		AActor* HitActor,
+		FVector HitLocation,
+		FVector HitNormal,
+		FVector AttackDirection
+	);
 
 	void SampleDistances();
 

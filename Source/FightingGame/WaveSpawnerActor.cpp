@@ -17,6 +17,26 @@ AWaveSpawnerActor::AWaveSpawnerActor()
 void AWaveSpawnerActor::BeginPlay()
 {
 	Super::BeginPlay();
+
+	UCombatDirectorSubsystem* Director = GetGameInstance() ? GetGameInstance()->GetSubsystem<UCombatDirectorSubsystem>() : nullptr;
+	if (!Director)
+	{
+		return;
+	}
+
+	if (Director->IsGameplayActive())
+	{
+		// Resuming into an already-active session
+		StartNextWave();
+	}
+	else
+	{
+		Director->OnGameplayActivated.AddDynamic(this, &AWaveSpawnerActor::OnGameplayActivatedHandler);
+	}
+}
+
+void AWaveSpawnerActor::OnGameplayActivatedHandler()
+{
 	StartNextWave();
 }
 
@@ -27,7 +47,7 @@ void AWaveSpawnerActor::StartNextWave()
 		return;
 	}
 
-	UCombatDirectorSubsystem* Director = GetWorld() ? GetWorld()->GetSubsystem<UCombatDirectorSubsystem>() : nullptr;
+	UCombatDirectorSubsystem* Director = GetGameInstance() ? GetGameInstance()->GetSubsystem<UCombatDirectorSubsystem>() : nullptr;
 	if (!Director)
 	{
 		return;
@@ -59,8 +79,14 @@ void AWaveSpawnerActor::StartNextWave()
 	}
 
 	CurrentWaveNumber++;
+
+	Director->MaxConcurrentAttackers = FMath::Min(2 + (CurrentWaveNumber / 3), 4);
+	EliteChance = FMath::Min(0.15f + (CurrentWaveNumber * 0.03f), 0.5f);
+
 	bWaveInProgress = true;
 	AliveCount = 0;
+
+	OnWaveStarted.Broadcast(CurrentWaveNumber);
 
 	if (bDebugSpawner)
 	{
@@ -77,6 +103,10 @@ void AWaveSpawnerActor::StartNextWave()
 void AWaveSpawnerActor::HandleEnemyDeath()
 {
 	AliveCount--;
+
+	EnemiesKilled++;
+
+	OnEnemyKilled.Broadcast(EnemiesKilled);
 
 	if (bDebugSpawner)
 	{
@@ -123,7 +153,7 @@ UEnemyRoleDataAsset* AWaveSpawnerActor::FindRoleAsset(EEnemyRole InRole) const
 
 void AWaveSpawnerActor::TryDirectorSpawn()
 {
-	UCombatDirectorSubsystem* Director = GetWorld() ? GetWorld()->GetSubsystem<UCombatDirectorSubsystem>() : nullptr;
+	UCombatDirectorSubsystem* Director = GetGameInstance() ? GetGameInstance()->GetSubsystem<UCombatDirectorSubsystem>() : nullptr;
 	if (!Director)
 	{
 		return;
@@ -193,7 +223,7 @@ void AWaveSpawnerActor::SpawnEnemy(UEnemyRoleDataAsset* RoleAsset)
 
 		AliveCount++;
 
-		if (UCombatDirectorSubsystem* Director = GetWorld()->GetSubsystem<UCombatDirectorSubsystem>())
+		if (UCombatDirectorSubsystem* Director = GetGameInstance() ? GetGameInstance()->GetSubsystem<UCombatDirectorSubsystem>() : nullptr)
 		{
 			if (FMath::FRand() < EliteChance)
 			{

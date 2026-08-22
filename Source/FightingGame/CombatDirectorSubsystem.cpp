@@ -2,23 +2,26 @@
 #include "CombatComponent.h"
 #include "GameFramework/Actor.h"
 
-void UCombatDirectorSubsystem::OnWorldBeginPlay(UWorld& InWorld)
+void UCombatDirectorSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
-	Super::OnWorldBeginPlay(InWorld);
+	Super::Initialize(Collection);
 
-	InWorld.GetTimerManager().SetTimer(
-		SampleTimer,
-		this,
-		&UCombatDirectorSubsystem::SampleDistances,
-		SampleInterval,
-		true);
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			SampleTimer,
+			this,
+			&UCombatDirectorSubsystem::SampleDistances,
+			SampleInterval,
+			true);
 
-	InWorld.GetTimerManager().SetTimer(
-		BudgetTimer,
-		this,
-		&UCombatDirectorSubsystem::TickBudget,
-		BudgetTickInterval,
-		true);
+		World->GetTimerManager().SetTimer(
+			BudgetTimer,
+			this,
+			&UCombatDirectorSubsystem::TickBudget,
+			BudgetTickInterval,
+			true);
+	}
 }
 
 void UCombatDirectorSubsystem::TickBudget()
@@ -185,7 +188,12 @@ void UCombatDirectorSubsystem::UnregisterActiveEnemy(AActor* EnemyActor)
 {
 	ActiveEnemies.Remove(EnemyActor);
 }
-void UCombatDirectorSubsystem::HandlePlayerSuccessfulHit(AActor* HitActor)
+void UCombatDirectorSubsystem::HandlePlayerSuccessfulHit(
+	AActor* HitActor,
+	FVector HitLocation,
+	FVector HitNormal,
+	FVector AttackDirection
+)
 {
 	if (!PlayerCombat)
 	{
@@ -195,7 +203,7 @@ void UCombatDirectorSubsystem::HandlePlayerSuccessfulHit(AActor* HitActor)
 	const float Damage = PlayerCombat->GetCurrentDamage();
 
 	// Guard against a hit registering after CurrentAttackDamage has already
-	// reset (late overlap resolution) - a zero-damage "hit" isn't a real data point.
+	// reset (late overlap resolution) - a zero-damage hit isn't a real data point.
 	if (Damage <= 0.f)
 	{
 		return;
@@ -212,7 +220,12 @@ void UCombatDirectorSubsystem::HandlePlayerSuccessfulHit(AActor* HitActor)
 	}
 }
 
-void UCombatDirectorSubsystem::HandleEnemySuccessfulHit(AActor* HitActor)
+void UCombatDirectorSubsystem::HandleEnemySuccessfulHit(
+	AActor* HitActor,
+	FVector HitLocation,
+	FVector HitNormal,
+	FVector AttackDirection
+)
 {
 	if (HitActor != PlayerActor)
 	{
@@ -310,4 +323,29 @@ bool UCombatDirectorSubsystem::TryAcquireAttackToken(AActor* Enemy)
 void UCombatDirectorSubsystem::ReleaseAttackToken(AActor* Enemy)
 {
 	ActiveAttackers.Remove(Enemy);
+}
+
+AActor* UCombatDirectorSubsystem::FindAttackerWithOpenPerfectDodgeWindow(AActor* Requester, float SearchRadius) const
+{
+	if (!Requester)
+		return nullptr;
+
+	for (AActor* Enemy : ActiveEnemies)
+	{
+		if (!IsValid(Enemy))
+			continue;
+
+		if (FVector::Dist(Enemy->GetActorLocation(), Requester->GetActorLocation()) > SearchRadius)
+			continue;
+
+		if (UCombatComponent* EnemyCombat = Enemy->FindComponentByClass<UCombatComponent>())
+		{
+			if (EnemyCombat->IsAttacking() && EnemyCombat->IsPerfectDodgeWindowOpen())
+			{
+				return Enemy;
+			}
+		}
+	}
+
+	return nullptr;
 }

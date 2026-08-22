@@ -39,7 +39,9 @@ void UDefenseComponent::TickComponent(
     }
 }
 
-bool UDefenseComponent::StartDodge(const FVector& Direction)
+bool UDefenseComponent::StartDodge(
+    const FVector& Direction,
+    AActor* IncomingThreatActor)
 {
     if (!OwnerCharacter)
     {
@@ -65,7 +67,8 @@ bool UDefenseComponent::StartDodge(const FVector& Direction)
 
     if (FinalDirection.IsNearlyZero())
     {
-        FinalDirection = OwnerCharacter->GetActorForwardVector();
+        FinalDirection =
+            OwnerCharacter->GetActorForwardVector();
     }
 
     FinalDirection.Normalize();
@@ -76,15 +79,21 @@ bool UDefenseComponent::StartDodge(const FVector& Direction)
     LockedRotation.Pitch = 0.f;
     LockedRotation.Roll = 0.f;
 
-    OwnerCharacter->SetActorRotation(LockedRotation);
+    OwnerCharacter->SetActorRotation(
+        LockedRotation);
 
     Movement->StopMovementImmediately();
     Movement->DisableMovement();
 
-    CurrentSpeed = DodgeDistance / DodgeDuration;
+    CurrentSpeed =
+        DodgeDistance / DodgeDuration;
 
     const FVector HorizontalDirection =
-        FVector(DodgeDirection.X, DodgeDirection.Y, 0.f).GetSafeNormal();
+        FVector(
+            DodgeDirection.X,
+            DodgeDirection.Y,
+            0.f
+        ).GetSafeNormal();
 
     Movement->Velocity =
         HorizontalDirection * CurrentSpeed;
@@ -94,11 +103,31 @@ bool UDefenseComponent::StartDodge(const FVector& Direction)
     bIsDodging = true;
     bCanDodge = false;
     bInvulnerable = true;
+    bLastDodgeWasPerfect = false;
 
-    if (UCombatComponent* Combat = OwnerCharacter->FindComponentByClass<UCombatComponent>())
+    // ---------------------------------------------------------
+    // PERFECT DODGE DETECTION
+    // ---------------------------------------------------------
+
+    if (IncomingThreatActor)
     {
-        Combat->SetCanAttack(false);
+        if (UCombatComponent* ThreatCombat =
+            IncomingThreatActor->FindComponentByClass<UCombatComponent>())
+        {
+            if (ThreatCombat->IsAttacking() &&
+                ThreatCombat->IsPerfectDodgeWindowOpen())
+            {
+                bLastDodgeWasPerfect = true;
+
+                OnPerfectDodge.Broadcast(
+                    IncomingThreatActor);
+            }
+        }
     }
+
+    // IMPORTANT:
+    // DefenseComponent no longer disables attacking here.
+    // Combat/attack logic remains independent of dodge state.
 
     OnDodgeStarted.Broadcast();
 
@@ -152,6 +181,7 @@ void UDefenseComponent::EndDodge()
     {
         return;
     }
+
     if (Movement)
     {
         Movement->SetMovementMode(MOVE_Walking);
@@ -163,7 +193,13 @@ void UDefenseComponent::EndDodge()
 
     StartCooldown();
 
-    if (GetWorld())
+    if (bLastDodgeWasPerfect)
+    {
+        // Perfect dodge earned an immediate punish opportunity.
+        // Do not apply the normal post-dodge attack lock.
+        FinishAttackLock();
+    }
+    else if (GetWorld())
     {
         GetWorld()->GetTimerManager().SetTimer(
             AttackLockHandle,
@@ -175,7 +211,6 @@ void UDefenseComponent::EndDodge()
 
     OnDodgeEnded.Broadcast();
 }
-
 void UDefenseComponent::StartCooldown()
 {
     if (!GetWorld())
