@@ -2,17 +2,19 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "Animation/AnimMontage.h"
 #include "TimerManager.h"
 #include "EnemyRoleDataAsset.h"
+#include "CombatMemory.h"
+#include "ThreatAssessment.h"
 #include "EnemyBrainComponent.generated.h"
 class UCombatComponent;
 class UDefenseComponent;
 class UHealthComponent;
 class UEnemyMovementComponent;
-
+class UHitReactionComponent;
 class AActor;
-
+class UCombatPerceptionComponent;
+class UCombatDirectorSubsystem;
 
 UENUM(BlueprintType)
 enum class ECombatAction : uint8
@@ -24,6 +26,7 @@ enum class ECombatAction : uint8
     LightAttack,
     HeavyAttack,
     Dodge,
+    Counter,
     Wait
 };
 
@@ -84,6 +87,9 @@ protected:
 
 public:
 
+    UPROPERTY(BlueprintReadOnly)
+    FThreatAssessment CurrentThreat;
+
     UFUNCTION(BlueprintCallable)
     void InitializeBrain();
 
@@ -96,8 +102,14 @@ public:
     UFUNCTION(BlueprintCallable)
     void Think();
 
+    UFUNCTION(BlueprintCallable)
+    bool ShouldContinueCombo() const;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Brain")
     float ThinkInterval = 0.25f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Brain")
+    float ThreatDangerRange = 300.f;
 
     UPROPERTY(EditAnywhere, Category = "Debug")
     bool bDebugBrain = true;
@@ -117,14 +129,19 @@ public:
     UPROPERTY(BlueprintAssignable)
     FOnDecisionMade OnDecisionMade;
 
-    UFUNCTION()
-    void ExecuteLightAttack();
-
-    UFUNCTION()
-    void ExecuteHeavyAttack();
-
     UFUNCTION(BlueprintCallable)
     void SetTarget(AActor* NewTarget);
+    UFUNCTION(BlueprintPure)
+    bool HasAttackToken() const { return bHasAttackToken; }
+
+    UPROPERTY()
+    UHitReactionComponent* HitReaction = nullptr;
+
+    UPROPERTY(BlueprintReadOnly)
+    FCombatMemoryState CurrentMemory;
+
+    UFUNCTION(BlueprintCallable)
+    void ApplyRuntimeOverride(const FRoleProfileOverride& Override);
 
 protected:
 
@@ -144,6 +161,9 @@ protected:
 
 private:
     UPROPERTY()
+    UCombatPerceptionComponent* Perception = nullptr;
+
+    UPROPERTY()
     UCombatComponent* Combat;
 
     UPROPERTY()
@@ -156,14 +176,31 @@ private:
     UEnemyMovementComponent* Movement;
     FTimerHandle ThinkTimer;
 
-    UPROPERTY(EditAnywhere, Category = "Combat")
-    UAnimMontage* LightAttackMontage = nullptr;
+    bool bHasAttackToken = false;
 
-    UPROPERTY(EditAnywhere, Category = "Combat")
-    UAnimMontage* HeavyAttackMontage = nullptr;
+    float GetNearbyAllyPenalty() const;
 
-    UPROPERTY(EditAnywhere, Category = "Combat")
-    float AttackCooldown = 1.0f;
+    UPROPERTY(EditAnywhere, Category = "Brain")
+    float AllyProximityRadius = 150.f;
 
-    float LastAttackTime = -100.f;
+    UFUNCTION()
+    void HandleOwnAttackEnded();
+
+
+private:
+    FCombatThreatAnalyzer ThreatAnalyzer;
+    FCombatMemoryTracker MemoryTracker;
+
+protected:
+    float ScoreCounter() const;
+
+private:
+    bool bLastDodgeWasLeft = false;
+
+
+
+private:
+    FRoleProfile GetEffectiveProfile() const;
+
+    FRoleProfileOverride RuntimeOverride;
 };

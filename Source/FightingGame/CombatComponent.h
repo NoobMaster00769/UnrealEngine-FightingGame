@@ -2,10 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "NiagaraSystem.h"
 #include "WeaponBase.h"
 #include "CombatComponent.generated.h"
 
 class UDefenseComponent;
+class AActor;
+class UPrimitiveComponent;
 
 UENUM(BlueprintType)
 enum class EAttackType : uint8
@@ -17,7 +20,17 @@ enum class EAttackType : uint8
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAttackStarted);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAttackEnded);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSuccessfulHit, AActor*, HitActor);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(
+	FOnSuccessfulHit,
+	AActor*,
+	HitActor,
+	FVector,
+	HitLocation,
+	FVector,
+	HitNormal,
+	FVector,
+	AttackDirection
+);
 
 UCLASS(ClassGroup = (Combat), Blueprintable, BlueprintType, meta = (BlueprintSpawnableComponent))
 class FIGHTINGGAME_API UCombatComponent : public UActorComponent
@@ -43,6 +56,9 @@ public:
 	/*=====================================================
 						ATTACK
 	=====================================================*/
+
+	UFUNCTION(BlueprintPure)
+	bool IsWeaponCollisionActive() const { return bWeaponCollisionActive; }
 
 	UFUNCTION(BlueprintCallable)
 	void StartLightAttack();
@@ -73,8 +89,23 @@ public:
 					  HIT REGISTRATION
 	=====================================================*/
 
+
+	UFUNCTION()
+	void SpawnBloodSpillDecals(
+		const FVector& HitLocation,
+		const FVector& HitNormal,
+		AActor* Victim
+	);
+
 	UFUNCTION(BlueprintCallable)
-	void RegisterHit(AActor* HitActor);
+	void RegisterHit(
+		AActor* HitActor,
+		UPrimitiveComponent* HitComponent,
+		const FVector& HitLocation,
+		const FVector& HitNormal,
+		const FVector& AttackDirection,
+		FName HitBoneName = NAME_None
+	);
 
 	UFUNCTION(BlueprintCallable)
 	void ClearHitActors();
@@ -114,10 +145,55 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SetCanAttack(bool bNewCanAttack);
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Blood")
+	TSubclassOf<AActor> BloodDecalClass;
+
+	UFUNCTION(BlueprintCallable)
+	void SetPerfectDodgeWindowOpen(bool bOpen) { bPerfectDodgeWindowOpen = bOpen; }
+
+	UFUNCTION(BlueprintPure)
+	bool IsPerfectDodgeWindowOpen() const { return bPerfectDodgeWindowOpen; }
+
+	UFUNCTION(BlueprintCallable)
+	void ActivatePerfectDodgeRewardWindow(float Duration);
+
+	UFUNCTION(BlueprintPure)
+	bool IsPerfectDodgeRewardWindowActive() const { return bPerfectDodgeRewardWindowActive; }
+
+	UPROPERTY(EditAnywhere, Category = "Combat|PerfectDodge")
+	float PerfectDodgeDamageMultiplier = 2.5f;
+
 private:
+	bool bPerfectDodgeWindowOpen = false;   // set by AnimNotifyState, true while the notify is active
+	bool bPerfectDodgeRewardWindowActive = false;
+	FTimerHandle PerfectDodgeRewardHandle;
+
+	void ClearPerfectDodgeRewardWindow();
+
+private:
+
+	bool SpawnBloodDecalOnSurface(
+		const FHitResult& SurfaceHit,
+		float SizeMultiplier = 1.0f
+	);
+
+	// --- Decal pooling ---
+	void InitializeDecalPool();
+	AActor* GetPooledDecal();
+
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Blood")
+	int32 DecalPoolSize = 20;
+
+	UPROPERTY()
+	TArray<TObjectPtr<AActor>> DecalPool;
+
+	int32 DecalPoolIndex = 0;
 
 	UPROPERTY()
 	UDefenseComponent* Defense = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Category = "Combat")
+	bool bWeaponCollisionActive = false;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Combat|Damage")
 	float LightAttackDamage = 20.f;
@@ -143,11 +219,10 @@ private:
 	UPROPERTY()
 	AWeaponBase* CurrentWeapon = nullptr;
 
-	/*
-		TSet gives O(1) lookup instead of
-		searching through an array every swing.
-	*/
 
 	UPROPERTY()
 	TSet<TObjectPtr<AActor>> HitActors;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UNiagaraSystem> BloodImpactEffect;
 };

@@ -30,16 +30,31 @@ void UHitReactionComponent::ReactToHit(EHitDirection Direction)
         return;
 
     bIsReacting = true;
-
     CurrentDirection = Direction;
 
     OnHitReactionStarted.Broadcast();
+
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().SetTimer(
+            ReactionTimer,
+            this,
+            &UHitReactionComponent::FinishReaction,
+            HitReactionTime,
+            false
+        );
+    }
 }
 
 
 void UHitReactionComponent::FinishReaction()
 {
     bIsReacting = false;
+
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(ReactionTimer);
+    }
 
     OnHitReactionFinished.Broadcast();
 }
@@ -52,4 +67,12 @@ bool UHitReactionComponent::IsReacting() const
 EHitDirection UHitReactionComponent::GetHitDirection() const
 {
     return CurrentDirection;
+}
+void UHitReactionComponent::CancelReaction()
+{
+    bIsReacting = false;
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(ReactionTimer);
+    }
 }

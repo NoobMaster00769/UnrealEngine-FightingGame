@@ -1,6 +1,7 @@
 #include "EnemyMovementComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "NavigationSystem.h"
+#include "DefenseComponent.h"
 #include "NavigationPath.h"
 #include "Runtime/AIModule/Classes/AIController.h"
 #include "GameFramework/Character.h"
@@ -19,7 +20,20 @@ void UEnemyMovementComponent::BeginPlay()
     bStrafeLeft = FMath::RandBool();
 }
 
+
+void UEnemyMovementComponent::MoveToFlankSlot(AActor* Target, FVector SlotWorldPosition)
+{
+    if (!OwnerCharacter || !Target)
+        return;
+
+    CurrentTarget = Target;
+    FlankPosition = SlotWorldPosition;
+    CurrentMovementMode = EEnemyMovementMode::Flank;
+}
+
 void UEnemyMovementComponent::TickComponent(
+
+
     float DeltaTime,
     ELevelTick TickType,
     FActorComponentTickFunction* ThisTickFunction)
@@ -29,8 +43,23 @@ void UEnemyMovementComponent::TickComponent(
         TickType,
         ThisTickFunction);
 
-    if (!OwnerCharacter || !CurrentTarget)
+    if (!OwnerCharacter)
+    {
         return;
+    }
+
+    UDefenseComponent* Defense =
+        OwnerCharacter->FindComponentByClass<UDefenseComponent>();
+
+    if (Defense && Defense->IsDodging())
+    {
+        return;
+    }
+
+    if (!CurrentTarget)
+    {
+        return;
+    }
 
     //---------------------------------
     // Face player
@@ -93,6 +122,18 @@ void UEnemyMovementComponent::TickComponent(
 
         break;
 
+    case EEnemyMovementMode::Flank:
+    {
+        FVector ToFlank = FlankPosition - OwnerCharacter->GetActorLocation();
+        ToFlank.Z = 0.f;
+
+        if (!ToFlank.IsNearlyZero(50.f))   // close enough to slot - hold position
+        {
+            OwnerCharacter->AddMovementInput(ToFlank.GetSafeNormal(), MovementSpeed);
+        }
+        break;
+    }
+
     default:
         break;
     }
@@ -131,6 +172,15 @@ void UEnemyMovementComponent::StrafeAroundTarget(AActor* Target)
 void UEnemyMovementComponent::StopMovement()
 {
     CurrentMovementMode = EEnemyMovementMode::None;
-    CurrentTarget = nullptr;
+}
+
+void UEnemyMovementComponent::SetTarget(AActor* Target)
+{
+    CurrentTarget = Target;
+}
+
+void UEnemyMovementComponent::SetStrafePreference(bool bPreferLeft)
+{
+    bStrafeLeft = bPreferLeft;
 }
 
